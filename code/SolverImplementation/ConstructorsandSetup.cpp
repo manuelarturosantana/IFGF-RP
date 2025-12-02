@@ -391,9 +391,9 @@ void Solver::compute_discretization_domain()
                     const double si = vec_si[nu];
                     const double tj = vec_tj[nv];
 
-                    parametrization_q(si, tj, q, disc_points_x[position], disc_points_y[position], disc_points_z[position]);
-                    normal_q(si, tj, q, norm_points_x[position], norm_points_y[position], norm_points_z[position]);
-                    dsdtjac[position] = dsi[nu] * dtj[nv] * jacobian_q(si, tj, q);
+                    parametrization_q(SPHERE_RADIUS, SPHERE_CENTER, si, tj, q, disc_points_x[position], disc_points_y[position], disc_points_z[position]);
+                    normal_q(SPHERE_RADIUS, si, tj, q, norm_points_x[position], norm_points_y[position], norm_points_z[position]);
+                    dsdtjac[position] = dsi[nu] * dtj[nv] * jacobian_q(SPHERE_RADIUS, si, tj, q);
 
                 }
             }

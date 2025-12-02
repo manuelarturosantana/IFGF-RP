@@ -36,7 +36,7 @@ inline void HH(
     const double dxdsdsx, const double dxdsdsy, const double dxdsdsz,
     const double dxdsdtx, const double dxdsdty, const double dxdsdtz,
     const double dxdtdtx, const double dxdtdty, const double dxdtdtz,
-    const double coupling_parameter,
+    const double coupling_parameter, double WAVE_NUMBER, int EQUATION_FORMULATION,
     std::complex<double>& solution)
 {
     
@@ -154,7 +154,7 @@ inline void HH(
 inline void HH2(const double p1x, const double p1y, const double p1z,
          const double p2x, const double p2y, const double p2z,
          const double nx, const double ny, const double nz,
-         double coupling_parameter,
+         double coupling_parameter, double WAVE_NUMBER, int EQUATION_FORMULATION,
          std::complex<double>& solution)
 {
 
@@ -230,7 +230,7 @@ inline void HH2(const double p1x, const double p1y, const double p1z,
 inline void HH_far(const double xVers_0, const double xVers_1, const double xVers_2,
             const double y_0, const double y_1, const double y_2,
             const double n_0, const double n_1, const double n_2,
-            const double coupling_parameter,
+            const double coupling_parameter, double WAVE_NUMBER, int EQUATION_FORMULATION,
             std::complex<double>& solution)
 {
 
@@ -295,6 +295,7 @@ class Solver
 
     private:
 
+        // TODO: MOVE THESE to the initialization
         static constexpr long long Nu_int_ = N_PTS_PER_PATCH[0], Nv_int_ = N_PTS_PER_PATCH[1];
         static constexpr long long Nu_prec_ = N_PTS_SING_INT[0], Nv_prec_ = N_PTS_SING_INT[1];
 
@@ -371,8 +372,83 @@ class Solver
     public:
         //////////////////////////////////// Parameters //////////////////////////////////
         int G_SEARCH_MAX_ITER = 50;
-        double G_SEARCH_TOL = 1E-12;    
+        double G_SEARCH_TOL = 1E-12;
 
+
+        // Choose integral equation formulation:
+
+        // Single Layer = 1
+        // Double Layer = 2
+        // Combined Layer = 3 
+        // 4
+        int EQUATION_FORMULATION = 3;
+
+        // Discretization parameters:
+
+        // Number of points used per dimension per patch in every patch
+        // TODO: MOVED CONSTEXPR FROM HERE
+        // long long N_PTS_PER_PATCH[2] = {6, 6};
+        // // Number of patch partitions along first and second dimensions
+        // long long N_SPLIT_PER_PATCH[2] = {16, 16};
+        
+        // // Singular integration parameters:
+
+        // // Number of points used with the singular integration
+        // int N_PTS_SING_INT[2] = {40, 40};
+        // Proximity distance that determines near singular integrals
+        int DELTA_METHOD = 1;
+        double PROXIMITY_BOX_SIZE = 0.1/16;
+        double PERCENT_BOX_SIZE = 0.15;
+
+        // GMRES options:
+        int MAX_ITER = 100;
+        double TOL_GMRES = 1E-4;
+
+        
+        // Geometry parameters:
+
+        // Sphere = 0
+        // Others = 1
+
+        const int GEOMETRY = 0;
+
+        // Sphere
+        const double SPHERE_RADIUS = 1.0;
+        std::array<double,3> SPHERE_CENTER = {0.0, 0.0, 0.0};
+        // constexpr long long N_PATCHES_ORIG = 6;
+        const bool EDGE_FLAG_U_A[N_PATCHES_ORIG] = {false};
+        const bool EDGE_FLAG_U_B[N_PATCHES_ORIG] = {false};
+        const bool EDGE_FLAG_V_A[N_PATCHES_ORIG] = {false};
+        const bool EDGE_FLAG_V_B[N_PATCHES_ORIG] = {false};
+
+        // Currently edge geometries are unsupported
+        // std::vector<bool> EDGE_FLAG_U_A;
+        // std::vector<bool> EDGE_FLAG_U_B;
+        // std::vector<bool> EDGE_FLAG_V_A;
+        // std::vector<bool> EDGE_FLAG_V_B;
+
+        std::string DIRECTORY = "";
+        std::string FILE_NAME = "";
+
+        // Incident field parameters:
+        // 0 = PLANE WAVE, 1 = POINT SOURCE
+        int PLANE_OR_POINT = 0; 
+
+        // Incident plane wave parameters (PLANE_OR_POINT = 0):
+        // kx = k*cos(the)*sin(phi)
+        // ky = k*sin(the)*sin(phi)
+        // kz = k*cos(phi)
+
+        // TODO: Move lambda out
+        double LAMBDA = 2.0 * SPHERE_RADIUS / 8.0; // 2.0 * M_PI / WAVE_NUMBER
+        double WAVE_NUMBER = 2.0 * M_PI / LAMBDA;
+        double PLANE_WAVE_THE = 0.0; // in [0, 2pi)
+        double PLANE_WAVE_PHI = M_PI; // in [0, pi]
+
+        // Incident source points (PLANE_OR_POINT = 1):
+        int NUM_POINT_SOURCES = 2;
+        std::vector<std::vector<double>> POINT_SOURCE_CENTER = {{0.0, 0.0, 3.3},
+                                                                    {0.0, 3.3, 0.0}};
 
 
         ///////////////////////////////// Methods ////////////////////////////////////////
@@ -425,11 +501,12 @@ class Solver
         void compute_new_order_points_RP(); // IFGF.cpp 
 
         void check_patch_in_neighbours(); // IFGF.cpp
+        
 
-        inline static void fct_4(const double x1, const double x2, const double x3,
+        inline void static fct_4(const double x1, const double x2, const double x3,
                                  const double y1, const double y2, const double y3,
                                  const double normal1, const double normal2, const double normal3,
-                                 const double coupling_parameter,
+                                 const double coupling_parameter, const double wavenumber, const int equation_formulation,
                                  const std::complex<double> density, 
                                  std::complex<double>& phi) 
         {
@@ -439,7 +516,7 @@ class Solver
             HH2(x1, x2, x3, 
                 y1, y2, y3,
                 normal1, normal2, normal3,
-                coupling_parameter,
+                coupling_parameter, wavenumber, equation_formulation,
                 kernel);
 
             const double kerreal = kernel.real();
@@ -452,7 +529,8 @@ class Solver
 
         }
 
-        inline static void fac_1(const double distance, std::complex<double>& sol)
+        // TODO: 
+        inline void static fac_1(const double distance, double WAVE_NUMBER, std::complex<double>& sol)
         {
 
             const double re = std::cos(WAVE_NUMBER * distance) / distance;

@@ -45,13 +45,13 @@ void Solver::beta(const double r_0, const double r_1, const double r_2,
                 double dxdsdtx, dxdsdty, dxdsdtz;
                 double dxdtdtx, dxdtdty, dxdtdtz;
 
-                parametrization_q(s, t, q, px, py, pz);
-                normal_q(s, t, q, nx, ny, nz);
-                dxds_q(s, t, q, dxdsx, dxdsy, dxdsz);
-                dxdt_q(s, t, q, dxdtx, dxdty, dxdtz);
-                dxdsds_q(s, t, q, dxdsdsx, dxdsdsy, dxdsdsz);
-                dxdsdt_q(s, t, q, dxdsdtx, dxdsdty, dxdsdtz);
-                dxdtdt_q(s, t, q, dxdtdtx, dxdtdty, dxdtdtz);                        
+                parametrization_q(SPHERE_RADIUS, SPHERE_CENTER, s, t, q, px, py, pz);
+                normal_q(SPHERE_RADIUS, s, t, q, nx, ny, nz);
+                dxds_q(SPHERE_RADIUS, s, t, q, dxdsx, dxdsy, dxdsz);
+                dxdt_q(SPHERE_RADIUS, s, t, q, dxdtx, dxdty, dxdtz);
+                dxdsds_q(SPHERE_RADIUS, s, t, q, dxdsdsx, dxdsdsy, dxdsdsz);
+                dxdsdt_q(SPHERE_RADIUS, s, t, q, dxdsdtx, dxdsdty, dxdsdtz);
+                dxdtdt_q(SPHERE_RADIUS, s, t, q, dxdtdtx, dxdtdty, dxdtdtz);                        
 
                 dxdsx *= der_eta(s, flag_u_loc) * 0.5 * (u_b_loc - u_a_loc);
                 dxdsy *= der_eta(s, flag_u_loc) * 0.5 * (u_b_loc - u_a_loc);
@@ -81,7 +81,7 @@ void Solver::beta(const double r_0, const double r_1, const double r_2,
                 dxdsdsx, dxdsdsy, dxdsdsz,
                 dxdsdtx, dxdsdty, dxdsdtz,
                 dxdtdtx, dxdtdty, dxdtdtz,
-                coupling_parameter_,
+                coupling_parameter_, WAVE_NUMBER, EQUATION_FORMULATION,
                 H[i*Nv_prec_+j]);
 
                 
@@ -138,7 +138,7 @@ void Solver::beta(const double r_0, const double r_1, const double r_2,
                 0.0, 0.0, 0.0,
                 0.0, 0.0, 0.0,
                 0.0, 0.0, 0.0,
-                coupling_parameter_,
+                coupling_parameter_,  WAVE_NUMBER, EQUATION_FORMULATION,
                 H[i*Nv_prec_+j]);
                 
                 H[i*Nv_prec_+j] *= muwi[i]*muwj[j];
@@ -413,12 +413,13 @@ void Solver::compute_precomputations()
 
                 if (GEOMETRY == 0) {
                 
-                    auto dist_func = [r_0, r_1, r_2, q, u_a_loc, u_b_loc, v_a_loc, v_b_loc](double s, double t) -> double {const double ss = ab2cd(-1.0, 1.0, u_a_loc, u_b_loc, s);
-                                                                                                                            const double tt = ab2cd(-1.0, 1.0, v_a_loc, v_b_loc, t);
-                                                                                                                            double rp_0, rp_1, rp_2;
-                                                                                                                            parametrization_q(ss, tt, q, rp_0, rp_1, rp_2);
-                                                                                                                            return ((r_0 - rp_0)*(r_0 - rp_0) + (r_1 - rp_1)*(r_1 - rp_1) + (r_2 - rp_2)*(r_2 - rp_2));};
-            
+                    auto dist_func = [this, r_0, r_1, r_2, q, u_a_loc, u_b_loc, v_a_loc, v_b_loc]
+                    (double s, double t) -> double {const double ss = ab2cd(-1.0, 1.0, u_a_loc, u_b_loc, s);
+                                const double tt = ab2cd(-1.0, 1.0, v_a_loc, v_b_loc, t);
+                                double rp_0, rp_1, rp_2;
+                                parametrization_q(SPHERE_RADIUS, SPHERE_CENTER, ss, tt, q, rp_0, rp_1, rp_2);
+                                return ((r_0 - rp_0)*(r_0 - rp_0) + (r_1 - rp_1)*(r_1 - rp_1) + (r_2 - rp_2)*(r_2 - rp_2));};
+
                     golden_search(dist_func, G_SEARCH_MAX_ITER, G_SEARCH_TOL, u_a_min, u_b_min, v_a_min, v_b_min, ubar_loc, vbar_loc); 
 
                 } else {
@@ -644,7 +645,7 @@ void Solver::int_far(const double r_0, const double r_1, const double r_2,
 
         // Compute kernel
         std::complex<double> kernel(0.0, 0.0);
-        HH2(r_0, r_1, r_2, px, py, pz, nx, ny, nz, coupling_parameter_, kernel);
+        HH2(r_0, r_1, r_2, px, py, pz, nx, ny, nz, coupling_parameter_, WAVE_NUMBER, EQUATION_FORMULATION, kernel);
 
         // Accumulate real and imaginary parts separately
         const std::complex<double> term = constant * kernel * phi[i];
