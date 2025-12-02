@@ -589,6 +589,73 @@ void Solver::compute_coeffs(std::complex<double>* phi,
 
 }
 
+ void Solver::int_near(const std::complex<double>* coeffs,
+                      const std::complex<double>* precomputations,
+                      std::complex<double>& solution)
+{
+    double sol_re = 0.0;
+    double sol_im = 0.0;
+
+    #pragma omp simd reduction(+:sol_re, sol_im)
+    for (int i = 0; i < Nu_int_ * Nv_int_; i++) {
+        const std::complex<double>& val = precomputations[i] * coeffs[i];
+        sol_re += val.real();
+        sol_im += val.imag();
+    }
+
+    solution = std::complex<double>(sol_re, sol_im);
+}
+
+
+void Solver::int_far(const double r_0, const double r_1, const double r_2,
+    const long long npatch, 
+    const std::complex<double>* phi,
+    std::complex<double>& solution)
+{
+
+    double sol_re = 0.0;
+    double sol_im = 0.0;
+
+    const long long size = Nu_int_ * Nv_int_;
+
+    const double* px_ptr = &disc_points_x_all_[npatch * size];
+    const double* py_ptr = &disc_points_y_all_[npatch * size];
+    const double* pz_ptr = &disc_points_z_all_[npatch * size];
+
+    const double* nx_ptr = &norm_points_x_all_[npatch * size];
+    const double* ny_ptr = &norm_points_y_all_[npatch * size];
+    const double* nz_ptr = &norm_points_z_all_[npatch * size];
+
+    const double* dsdtjac_ptr = &dsdtjac_all_[npatch * size];
+
+    #pragma omp simd reduction(+:sol_re, sol_im)
+    for (int i = 0; i < size; i++) {
+
+        const double dsdtjac_loc = dsdtjac_ptr[i];
+        const double constant = dsdtjac_loc * fejer_weights_u_v_int_[i];
+
+        const double px = px_ptr[i];
+        const double py = py_ptr[i];
+        const double pz = pz_ptr[i];
+
+        const double nx = nx_ptr[i];
+        const double ny = ny_ptr[i];
+        const double nz = nz_ptr[i];
+
+        // Compute kernel
+        std::complex<double> kernel(0.0, 0.0);
+        HH2(r_0, r_1, r_2, px, py, pz, nx, ny, nz, coupling_parameter_, kernel);
+
+        // Accumulate real and imaginary parts separately
+        const std::complex<double> term = constant * kernel * phi[i];
+        sol_re += term.real();
+        sol_im += term.imag();
+    }
+
+// Combine back into solution
+solution = std::complex<double>(sol_re, sol_im);
+}
+
 void Solver::compute_intensities_patch(const long long npatch,
                                        const std::complex<double>* phi, 
                                        std::complex<double>* intensities)
