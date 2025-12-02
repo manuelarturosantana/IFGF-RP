@@ -1277,3 +1277,228 @@ void Solver::compute_near_singular_patches_estimate()
     std::vector<std::unordered_set<long long>>().swap(patches_not_in_rank);
             
 }
+
+void Solver::setup(bool timing)
+{
+
+    MPI_Barrier(MPI_COMM_WORLD);
+
+    double start_1 = MPI_Wtime();
+
+    compute_parallel_parameters();
+
+    double end_1 = MPI_Wtime();
+
+    if (timing && world_rank_ == 0) {
+
+        std::cout << "Time compute parallel parameters: " << end_1 - start_1 << " seconds\n";
+        print_max_RSS();
+
+    }
+
+    MPI_Barrier(MPI_COMM_WORLD);
+
+    double start_2 = MPI_Wtime();
+
+    if (GEOMETRY != 0) {
+
+        load_interpolated_surface();
+
+    }
+
+    double end_2 = MPI_Wtime();
+
+    if (GEOMETRY != 0 && timing && world_rank_ == 0) {
+
+        std::cout << "Time load interpolated surface: " << end_2 - start_2 << " seconds\n";
+        print_max_RSS();
+
+    }
+
+    MPI_Barrier(MPI_COMM_WORLD);
+
+    double start_3 = MPI_Wtime();
+
+    compute_fejer_nodes_and_weights();
+
+    double end_3 = MPI_Wtime();
+
+    if (timing && world_rank_ == 0) {
+
+        std::cout << "Time compute Fejer nodes and weights: " << end_3 - start_3 << " seconds\n";
+        print_max_RSS();
+
+    }
+
+    MPI_Barrier(MPI_COMM_WORLD);
+
+    double start_4 = MPI_Wtime();
+
+    compute_chebyshev_evaluations();
+
+    double end_4 = MPI_Wtime();
+
+    if (timing && world_rank_ == 0) {
+
+        std::cout << "Time compute Chebyshev evaluations: " << end_4 - start_4 << " seconds\n";
+        print_max_RSS();
+
+    }
+
+    MPI_Barrier(MPI_COMM_WORLD);
+
+    double start_5 = MPI_Wtime();
+
+    compute_flags_domain();
+
+    double end_5 = MPI_Wtime();
+
+    if (timing && world_rank_ == 0) {
+
+        std::cout << "Time compute flags domain: " << end_5 - start_5 << " seconds\n";
+        print_max_RSS();
+
+    }
+
+    MPI_Barrier(MPI_COMM_WORLD);
+
+    double start_6 = MPI_Wtime();
+
+    compute_discretization_domain();
+
+    double end_6 = MPI_Wtime();
+
+    if (timing && world_rank_ == 0) {
+
+        std::cout << "Time compute discretization domain: " << end_6 - start_6 << " seconds\n";
+        print_max_RSS();
+
+    }
+
+    MPI_Barrier(MPI_COMM_WORLD);
+
+    double start_7 = MPI_Wtime();
+
+    compute_coupling_parameter();  
+
+    double end_7 = MPI_Wtime();
+
+    if (timing && world_rank_ == 0) {
+
+        std::cout << "Time compute coupling parameter: " << end_7 - start_7 << " seconds\n";
+        print_max_RSS();
+
+    }
+
+    MPI_Barrier(MPI_COMM_WORLD);  
+
+    double start_8 = MPI_Wtime();   
+
+    compute_near_singular_patches_estimate();   
+
+    double end_8 = MPI_Wtime();
+
+    if (timing && world_rank_ == 0) {
+
+        std::cout << "Time compute near singular patches estimate: " << end_8 - start_8 << " seconds\n";
+        print_max_RSS();
+
+    }
+
+    MPI_Barrier(MPI_COMM_WORLD);  
+
+    double start_9 = MPI_Wtime();
+
+    compute_precomputations();
+
+    double end_9 = MPI_Wtime();
+
+    if (timing && world_rank_ == 0) {
+
+        std::cout << "Time compute precomputations data: " << end_9 - start_9 << " seconds\n";
+        print_max_RSS();
+
+    }
+
+    MPI_Barrier(MPI_COMM_WORLD);
+
+    double start_10 = MPI_Wtime();
+
+    if (USE_ACCELERATOR) {
+
+        create_IFGF_object();
+
+    }
+
+    double end_10 = MPI_Wtime();
+
+    if (USE_ACCELERATOR && timing && world_rank_ == 0) {
+
+        std::cout << "Time create IFGF object: " << end_10 - start_10 << " seconds\n";
+        print_max_RSS();
+
+    }
+
+    MPI_Barrier(MPI_COMM_WORLD);
+
+    double start_11 = MPI_Wtime();
+
+    if (USE_ACCELERATOR) {
+
+        set_precomputations_data_IFGF();
+
+    }
+
+    double end_11 = MPI_Wtime();
+
+    if (USE_ACCELERATOR && timing && world_rank_ == 0) {
+
+        std::cout << "Time set precomputation data in IFGF: " << end_11 - start_11 << " seconds\n";
+        print_max_RSS();
+
+    }
+
+    MPI_Barrier(MPI_COMM_WORLD); 
+
+    double start_12 = MPI_Wtime();
+
+    if (USE_ACCELERATOR) {
+
+        compute_new_order_points_RP();                
+
+    }
+
+    double end_12 = MPI_Wtime();
+
+    if (USE_ACCELERATOR && timing && world_rank_ == 0) {
+
+        std::cout << "Time compute new order points RP: " << end_12 - start_12 << " seconds\n";
+        print_max_RSS();
+
+    }
+
+    MPI_Barrier(MPI_COMM_WORLD); 
+
+    double start_13 = MPI_Wtime();
+
+    if (USE_ACCELERATOR) {
+
+        check_patch_in_neighbours();
+
+    }
+
+    double end_13 = MPI_Wtime();
+
+    if (USE_ACCELERATOR && timing && world_rank_ == 0) {
+
+        std::cout << "Time check patch in neighbours: " << end_13 - start_13 << " seconds\n";
+        print_max_RSS();
+
+    }
+
+    MPI_Barrier(MPI_COMM_WORLD);
+
+}
+
+
+
