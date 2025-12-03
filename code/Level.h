@@ -32,7 +32,7 @@ class Level {
         const double boxsize_z_;
         const double boxsize_;
 
-        const double wavenumber_;
+        const std::complex<double> wavenumber_;
 
         const long long nboxesperside_;
 
@@ -70,7 +70,7 @@ class Level {
         Level(const int level,
               const double min_x, const double min_y, const double min_z,
               const double boxsize_x, const double boxsize_y, const double boxsize_z,
-              const double wavenumber):
+              const std::complex<double> wavenumber):
               level_(level), min_x_(min_x), min_y_(min_y), min_z_(min_z),
               boxsize_x_(boxsize_x), boxsize_y_(boxsize_y), boxsize_z_(boxsize_z), boxsize_(boxsize_x),
               nboxesperside_(std::pow(2, level_)), wavenumber_(wavenumber) {
@@ -93,7 +93,7 @@ class Level {
             long long nconeslevelscaling = 1;
 
             if (level_ > 1)
-                nconeslevelscaling = std::max<long long>(1, std::ceil(wavenumber_ * boxsize_ * M_1_PI * 1.2)); //?
+                nconeslevelscaling = std::max<long long>(1, std::ceil(wavenumber_.real() * boxsize_ * M_1_PI * 1.2)); //?
 
             nconeselevation_ = nconeslevelscaling * nconeselevation;
             const long long nconesradialonlevel = nconeslevelscaling * nconesradial;

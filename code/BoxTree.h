@@ -69,14 +69,16 @@ class BoxTree
 
         // These parameters need to be passed in from Solver
         int nlevels_;
-        double wavenumber_; 
+        std::complex<double> wavenumber_;
+        std::complex<double> coupling_parameter_; 
         double BBSIZEOFFSET;
         bool USE_ADAPTIVITY;
         bool USE_ACCELERATOR;
         long long MAX_ELEMS_LEAF;
 
 
-        double coupling_parameter_;
+     
+
         std::unordered_map<long long, std::unordered_set<long long>> precomputations_data_;
 
         std::vector<Level*> levels_;
@@ -2204,7 +2206,7 @@ class BoxTree
         }
 
         template <void _kernel(const double, const double, const double, const double, const double, const double, const double, const double, const double,
-                               const double, const double, const std::complex<double>, 
+                               const std::complex<double>, const std::complex<double>, const std::complex<double>, 
                                std::complex<double>&)>
         void SingularInteractions(const std::vector<std::complex<double>>& density,
                                   const std::unordered_map<long long, std::complex<double>>& density_not_in_rank,
@@ -2361,8 +2363,8 @@ class BoxTree
         }
 
         template <void _kernel(const double, const double, const double, const double, const double, const double, const double, const double, const double,
-                               const double, const double, const std::complex<double>, std::complex<double>&),
-                  void _factorization(const double, const double, std::complex<double>&)>
+                               const std::complex<double>, const std::complex<double>, const std::complex<double>, std::complex<double>&),
+                  void _factorization(const double, const std::complex<double>, std::complex<double>&)>
         void LevelDEvaluations(const std::vector<std::complex<double>>& density,
                                const std::unordered_map<long long, std::complex<double>>& density_not_in_rank,
                                std::vector<std::complex<double>>& conesegments_current,
@@ -2601,8 +2603,8 @@ class BoxTree
         }
 
         template<void _kernel(const double, const double, const double, const double, const double, const double, const double, const double, const double,
-                              const double, const double, const std::complex<double>, std::complex<double>&),
-                 void _factorization(const double, const double, std::complex<double>&)>
+                              const std::complex<double>, const std::complex<double>, const std::complex<double>, std::complex<double>&),
+                 void _factorization(const double, const std::complex<double>, std::complex<double>&)>
         void Interpolation(const int level, const std::unordered_map<long long, std::vector<std::complex<double>>>& coeffs,
                            const std::vector<std::complex<double>>& density, const std::unordered_map<long long, std::complex<double>>& density_not_in_rank,
                            std::vector<std::complex<double>>& conesegments_prev,
@@ -2888,8 +2890,8 @@ class BoxTree
         }
 
         template<void _kernel(const double, const double, const double, const double, const double, const double, const double, const double, const double,
-                              const double, const double, const std::complex<double>, std::complex<double>&),
-                 void _factorization(const double, const double, std::complex<double>&)>
+                              const std::complex<double>, const std::complex<double>, const std::complex<double>, std::complex<double>&),
+                 void _factorization(const double, const std::complex<double>, std::complex<double>&)>
         void Propagation(const int level, const std::unordered_map<long long, std::vector<std::complex<double>>>& coeffs,
                             const std::vector<std::complex<double>>& density, const std::unordered_map<long long, std::complex<double>>& density_not_in_rank,
                             std::vector<std::complex<double>>& conesegments_current, const std::vector<std::complex<double>>& conesegments_prev) 
@@ -3121,7 +3123,7 @@ class BoxTree
                               const std::vector<long long>& split_points,
                               const std::vector<MPI_Count>& recv_counts,
                               const std::vector<MPI_Aint>& displs,
-                              double coupling_parameter, double WAVE_NUMBER, double bbsizeoffset,
+                              std::complex<double> coupling_parameter, std::complex<double> WAVE_NUMBER, double bbsizeoffset,
                               int Nu_int, int Nv_int, 
                               bool use_adaptivity, bool use_acc, long long max_elems_per_leaf, int n_levels_ifgf, 
                               std::vector<long long>& sorting, MPI_Comm mpi_comm)
@@ -3260,8 +3262,8 @@ class BoxTree
         }
 
         template <void _kernel(const double, const double, const double, const double, const double, const double, const double, const double, const double,
-        const double, const double, const std::complex<double>, std::complex<double>&),
-        void _factorization(const double, const double, std::complex<double>&)>
+        const std::complex<double>, const std::complex<double>, const std::complex<double>, std::complex<double>&),
+        void _factorization(const double, const std::complex<double>, std::complex<double>&)>
         void Solve(std::vector<std::complex<double>>& density,
                    const std::vector<double>& x,
                    const std::vector<double>& y,
@@ -3273,8 +3275,8 @@ class BoxTree
         }
 
         template <void _kernel(const double, const double, const double, const double, const double, const double, const double, const double, const double,
-        const double, const double, const std::complex<double>, std::complex<double>&),
-        void _factorization(const double, const double, std::complex<double>&)>
+        const std::complex<double>, const std::complex<double>, const std::complex<double>, std::complex<double>&),
+        void _factorization(const double, const std::complex<double>, std::complex<double>&)>
         void Solve(std::vector<std::complex<double>>& density) {
 
             Solve<_kernel, _factorization>(density, x_, y_, z_, true);
@@ -3282,8 +3284,8 @@ class BoxTree
         }
 
         template <void _kernel(const double, const double, const double, const double, const double, const double, const double, const double, const double,
-        const double, const double, const std::complex<double>, std::complex<double>&),
-        void _factorization(const double, const double, std::complex<double>&)>
+        const std::complex<double>, const std::complex<double>, const std::complex<double>, std::complex<double>&),
+        void _factorization(const double, const std::complex<double>, std::complex<double>&)>
         void SolveOrig(std::vector<std::complex<double>>& density,
                        const std::vector<double>& x,
                        const std::vector<double>& y,

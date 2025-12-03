@@ -1552,7 +1552,7 @@ Solver<PS,PT>::Solver( const std::string directory,
 }
 
 template<int PS, int PT>
-void Solver<PS,PT>::init_solver(const bool timing, const double k, MPI_Comm mpi_comm)  
+void Solver<PS,PT>::init_solver(const bool timing, const std::complex<double> k, MPI_Comm mpi_comm)  
 {
 
     WAVE_NUMBER = k;

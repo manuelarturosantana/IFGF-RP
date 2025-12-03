@@ -153,6 +153,9 @@ class Solver
         // so it can be passed in by template, which is a performance issue.
         static inline int EQUATION_FORMULATION = 3;
 
+        // -1 interior, 1 exterior problem
+        static inline int INT_EXT = 1;
+
 
 
         // Discretization parameters:
@@ -206,8 +209,7 @@ class Solver
         // ky = k*sin(the)*sin(phi)
         // kz = k*cos(phi)
        
-        // std::complex<double> WAVE_NUMBER = std::complex<double>(M_PI, 0);
-        double WAVE_NUMBER = M_PI;
+        std::complex<double> WAVE_NUMBER = std::complex<double>(M_PI, 0);
         double PLANE_WAVE_THE = 0.0; // in [0, 2pi)
         double PLANE_WAVE_PHI = M_PI; // in [0, pi]
 
@@ -296,13 +298,13 @@ class Solver
             const double dxdsdsx, const double dxdsdsy, const double dxdsdsz,
             const double dxdsdtx, const double dxdsdty, const double dxdsdtz,
             const double dxdtdtx, const double dxdtdty, const double dxdtdtz,
-            const double coupling_parameter, double wavenumber,
+            const std::complex<double> coupling_parameter, std::complex<double> wavenumber,
             std::complex<double>& solution);  // GreenFunctions.cpp
 
         void static HH2(const double p1x, const double p1y, const double p1z,
          const double p2x, const double p2y, const double p2z,
          const double nx, const double ny, const double nz,
-         double coupling_parameter, double wavenumber,
+         std::complex<double> coupling_parameter, std::complex<double> wavenumber,
          std::complex<double>& solution);  // GreenFunctions.cpp
 
         void static HH_far(const double xVers_0, const double xVers_1, const double xVers_2,
@@ -315,11 +317,11 @@ class Solver
         void static fct_4(const double x1, const double x2, const double x3,
                                  const double y1, const double y2, const double y3,
                                  const double normal1, const double normal2, const double normal3,
-                                 const double coupling_parameter, const double wavenumber,
+                                 const std::complex<double> coupling_parameter, const std::complex<double> wavenumber,
                                  const std::complex<double> density, 
                                  std::complex<double>& phi);  // GreenFunctions.cpp
      
-        void static fac_1(const double distance, double wavenumber, std::complex<double>& sol); // GreenFunctions.cpp
+        void static fac_1(const double distance, std::complex<double> wavenumber, std::complex<double>& sol); // GreenFunctions.cpp
 
 
         void compute_intensities_patch(const long long npatch,
@@ -393,16 +395,7 @@ class Solver
        
 
         void init_solver(const bool timing, 
-        const std::complex<double> k, 
-        const int* n_pts_per_patch,
-        const int* n_split_per_patch,
-        const int* n_pts_sing_int,
-        const double proximity_box_size,
-        const int n_levels_IFGF, 
-        const MPI_Comm& mpi_comm);
-
-        void init_solver(const bool timing, 
-            const double k, MPI_Comm mpi_comm = MPI_COMM_WORLD);
+            const std::complex<double> k, MPI_Comm mpi_comm = MPI_COMM_WORLD);
 
 
 

@@ -378,13 +378,15 @@ template<int PS, int PT>
 std::vector<std::complex<double>> Solver<PS,PT>::compute_incident_field() 
 {
 
+    static const std::complex<double> I(0.0,1.0);
+
     std::vector<std::complex<double>> u_inc(point_up_ - point_low_, 0);
 
     if (PLANE_OR_POINT == 0) {
 
-        const double k_hat_0 = WAVE_NUMBER * std::cos(PLANE_WAVE_THE) * std::sin(PLANE_WAVE_PHI);
-        const double k_hat_1 = WAVE_NUMBER * std::sin(PLANE_WAVE_THE) * std::sin(PLANE_WAVE_PHI);
-        const double k_hat_2 = WAVE_NUMBER * std::cos(PLANE_WAVE_PHI);
+        const double k_hat_0 = std::cos(PLANE_WAVE_THE) * std::sin(PLANE_WAVE_PHI);
+        const double k_hat_1 = std::sin(PLANE_WAVE_THE) * std::sin(PLANE_WAVE_PHI);
+        const double k_hat_2 = std::cos(PLANE_WAVE_PHI);
         
         #pragma omp parallel for
         for (long long i = 0; i < point_up_ - point_low_; i++) {
@@ -397,7 +399,8 @@ std::vector<std::complex<double>> Solver<PS,PT>::compute_incident_field()
 
             const double inner_product = x_0 * k_hat_0 + x_1 * k_hat_1 + x_2 * k_hat_2;
 
-            const std::complex<double> value((-1.0) * std::cos(inner_product), (-1.0) * std::sin(inner_product));
+            const std::complex<double> value = -1.0 * std::exp(I * WAVE_NUMBER * inner_product);
+            // value((-1.0) * std::cos(inner_product), (-1.0) * std::sin(inner_product));
 
             u_inc[i] = value;
 
@@ -405,7 +408,7 @@ std::vector<std::complex<double>> Solver<PS,PT>::compute_incident_field()
 
     } else {
 
-        const double k = WAVE_NUMBER;
+        const std::complex<double> k = WAVE_NUMBER;
         
         #pragma omp parallel for
         for (long long j = 0; j < point_up_ - point_low_; j++) {
@@ -424,7 +427,9 @@ std::vector<std::complex<double>> Solver<PS,PT>::compute_incident_field()
 
                 const double diff = std::sqrt((x_0-y_0)*(x_0-y_0) + (x_1-y_1)*(x_1-y_1) + (x_2-y_2)*(x_2-y_2));
 
-                const std::complex<double> value((-1.0) * std::cos(k * diff) / diff, (-1.0) * std::sin(k * diff) / diff);
+                const std::complex<double> value = -1.0 * std::exp(I * (k * diff)) / diff;
+                
+                // ((-1.0) * std::cos(k * diff) / diff, (-1.0) * std::sin(k * diff) / diff);
 
                 u_inc[j] += value;
 
@@ -441,18 +446,20 @@ std::vector<std::complex<double>> Solver<PS,PT>::compute_incident_field()
 template<int PS, int PT>
 std::complex<double> Solver<PS,PT>::compute_incident_field(double x, double y, double z) 
 {
-
+    
+    static const std::complex<double> I(0.0,1.0);
     std::complex<double> u_inc = {0.0, 0.0};
 
     if (PLANE_OR_POINT == 0) {
 
-        const double k_hat_0 = WAVE_NUMBER * std::cos(PLANE_WAVE_THE) * std::sin(PLANE_WAVE_PHI);
-        const double k_hat_1 = WAVE_NUMBER * std::sin(PLANE_WAVE_THE) * std::sin(PLANE_WAVE_PHI);
-        const double k_hat_2 = WAVE_NUMBER * std::cos(PLANE_WAVE_PHI);            
+        const double k_hat_0 = std::cos(PLANE_WAVE_THE) * std::sin(PLANE_WAVE_PHI);
+        const double k_hat_1 = std::sin(PLANE_WAVE_THE) * std::sin(PLANE_WAVE_PHI);
+        const double k_hat_2 = std::cos(PLANE_WAVE_PHI);            
 
         const double inner_product = x * k_hat_0 + y * k_hat_1 + z * k_hat_2;
 
-        const std::complex<double> value((-1.0) * std::cos(inner_product), (-1.0) * std::sin(inner_product));
+        const std::complex<double> value = -1.0 * std::exp(I * WAVE_NUMBER * inner_product);
+        // const std::complex<double> value((-1.0) * std::cos(inner_product), (-1.0) * std::sin(inner_product));
 
         u_inc = value;
 
@@ -468,7 +475,8 @@ std::complex<double> Solver<PS,PT>::compute_incident_field(double x, double y, d
 
             const double diff = std::sqrt((x_0-x)*(x_0-x) + (x_1-y)*(x_1-y) + (x_2-z)*(x_2-z));
 
-            const std::complex<double> value((-1.0) * std::cos(k * diff) / diff, (-1.0) * std::sin(k * diff) / diff);
+            const std::complex<double> value = -1.0 * std::exp(I * (k * diff)) / diff;
+            // const std::complex<double> value((-1.0) * std::cos(k * diff) / diff, (-1.0) * std::sin(k * diff) / diff);
 
             u_inc += value;
 
@@ -563,7 +571,7 @@ void Solver<PS,PT>::int_far_field(const double xVers_0, const double xVers_1, co
 
         std::complex<double> kernel;
         HH_far(xVers_0, xVers_1, xVers_2, px, py, pz, nx, ny, nz, coupling_parameter_, 
-              WAVE_NUMBER,  kernel);
+              WAVE_NUMBER.real(),  kernel);
 
         sol_re += constant * (kernel.real() * phi[i].real() - kernel.imag() * phi[i].imag());
         sol_im += constant * (kernel.real() * phi[i].imag() + kernel.imag() * phi[i].real());
@@ -654,16 +662,16 @@ std::complex<double> Solver<PS,PT>::compute_far_field_exact(const double xVers_0
 
     long long nterms = 0;
 
-    std::complex<double> yn = std::sph_neumann(nterms, WAVE_NUMBER * SPHERE_RADIUS);
-    std::complex<double> jn = std::sph_bessel(nterms, WAVE_NUMBER * SPHERE_RADIUS);
+    std::complex<double> yn = std::sph_neumann(nterms, WAVE_NUMBER.real() * SPHERE_RADIUS);
+    std::complex<double> jn = std::sph_bessel(nterms, WAVE_NUMBER.real() * SPHERE_RADIUS);
     std::complex<double> hn = jn + I * yn;
 
     while (std::abs(hn) * std::abs(hn) < 1.0e14) {
 
         nterms++;
 
-        yn = std::sph_neumann(nterms, WAVE_NUMBER * SPHERE_RADIUS);
-        jn = std::sph_bessel(nterms, WAVE_NUMBER * SPHERE_RADIUS);
+        yn = std::sph_neumann(nterms, WAVE_NUMBER.real() * SPHERE_RADIUS);
+        jn = std::sph_bessel(nterms, WAVE_NUMBER.real() * SPHERE_RADIUS);
         hn = jn + I * yn;
 
     }
@@ -673,8 +681,8 @@ std::complex<double> Solver<PS,PT>::compute_far_field_exact(const double xVers_0
     
     for (long long n = 0; n <= nterms; n++) {
 
-        const std::complex<double> yn = std::sph_neumann(n, WAVE_NUMBER * SPHERE_RADIUS);
-        const std::complex<double> jn = std::sph_bessel(n, WAVE_NUMBER * SPHERE_RADIUS);
+        const std::complex<double> yn = std::sph_neumann(n, WAVE_NUMBER.real() * SPHERE_RADIUS);
+        const std::complex<double> jn = std::sph_bessel(n, WAVE_NUMBER.real() * SPHERE_RADIUS);
         const std::complex<double> hn = jn + I * yn;
 
         const double P = std::legendre(n, x);
@@ -683,7 +691,7 @@ std::complex<double> Solver<PS,PT>::compute_far_field_exact(const double xVers_0
 
     }
 
-    solution *= I / (WAVE_NUMBER * SPHERE_RADIUS);
+    solution *= I / (WAVE_NUMBER.real() * SPHERE_RADIUS);
 
     return solution;
 
