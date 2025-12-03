@@ -1,7 +1,7 @@
 
 #include "../solver2.h"
-
-void Solver::beta(const double r_0, const double r_1, const double r_2,
+template<int PS, int PT>
+void Solver<PS,PT>::beta(const double r_0, const double r_1, const double r_2,
                   const long long q, const int flag_u_loc, const int flag_v_loc, 
                   const double u_a_loc, const double u_b_loc, const double v_a_loc, const double v_b_loc,
                   const double ubar_loc, const double vbar_loc,
@@ -168,8 +168,8 @@ void Solver::beta(const double r_0, const double r_1, const double r_2,
     
 }
 
-
-void Solver::compute_precomputations()
+template<int PS, int PT>
+void Solver<PS,PT>::compute_precomputations()
 {
     
     std::vector<double> vec_mean_size;
@@ -491,8 +491,8 @@ void Solver::compute_precomputations()
 
 }
 
-
-void Solver::get_coeffs(const long long q, const std::complex<double>* phi, 
+template<int PS, int PT>
+void Solver<PS,PT>::get_coeffs(const long long q, const std::complex<double>* phi, 
                             std::complex<double>* coeffs)
 {
 
@@ -565,8 +565,8 @@ void Solver::get_coeffs(const long long q, const std::complex<double>* phi,
 
 }
 
-
-void Solver::compute_coeffs(std::complex<double>* phi,
+template<int PS, int PT>
+void Solver<PS,PT>::compute_coeffs(std::complex<double>* phi,
                     std::unordered_map<long long, std::vector<std::complex<double>>>& phi_not_in_rank,
                     std::vector<std::complex<double>>& vec_coeffs)
 {
@@ -589,8 +589,8 @@ void Solver::compute_coeffs(std::complex<double>* phi,
     }
 
 }
-
- void Solver::int_near(const std::complex<double>* coeffs,
+template<int PS, int PT>
+void Solver<PS,PT>::int_near(const std::complex<double>* coeffs,
                       const std::complex<double>* precomputations,
                       std::complex<double>& solution)
 {
@@ -607,8 +607,8 @@ void Solver::compute_coeffs(std::complex<double>* phi,
     solution = std::complex<double>(sol_re, sol_im);
 }
 
-
-void Solver::int_far(const double r_0, const double r_1, const double r_2,
+template<int PS, int PT>
+void Solver<PS,PT>::int_far(const double r_0, const double r_1, const double r_2,
     const long long npatch, 
     const std::complex<double>* phi,
     std::complex<double>& solution)
@@ -657,7 +657,8 @@ void Solver::int_far(const double r_0, const double r_1, const double r_2,
 solution = std::complex<double>(sol_re, sol_im);
 }
 
-void Solver::compute_intensities_patch(const long long npatch,
+template<int PS, int PT>
+void Solver<PS,PT>::compute_intensities_patch(const long long npatch,
                                        const std::complex<double>* phi, 
                                        std::complex<double>* intensities)
  {        
@@ -678,7 +679,8 @@ void Solver::compute_intensities_patch(const long long npatch,
 
 }
 
-void Solver::compute_intensities(const std::complex<double>* phi,
+template<int PS, int PT>
+void Solver<PS,PT>::compute_intensities(const std::complex<double>* phi,
                                  std::vector<std::complex<double>>& intensities)
 {
 
@@ -842,7 +844,8 @@ void Solver::compute_intensities(const std::complex<double>* phi,
 
 }
 
-void Solver::redistribute_data_RP(const std::vector<std::complex<double>>& intensities, 
+template<int PS, int PT>
+void Solver<PS,PT>::redistribute_data_RP(const std::vector<std::complex<double>>& intensities, 
                                     std::complex<double>* rhs)
 {
 

@@ -2,8 +2,8 @@
 
 #include "../solver2.h"
 
-
-void Solver::HH(
+template<int PS, int PT>
+void Solver<PS,PT>::HH(
     const double p1x, const double p1y, const double p1z,
     const double p2x, const double p2y, const double p2z,
     const double nx, const double ny, const double nz,
@@ -127,7 +127,8 @@ void Solver::HH(
 
 }
 
-void Solver::HH2(const double p1x, const double p1y, const double p1z,
+template<int PS, int PT>
+void Solver<PS,PT>::HH2(const double p1x, const double p1y, const double p1z,
          const double p2x, const double p2y, const double p2z,
          const double nx, const double ny, const double nz,
          double coupling_parameter, double wavenumber,
@@ -203,7 +204,8 @@ void Solver::HH2(const double p1x, const double p1y, const double p1z,
 
 }
 
-void Solver::HH_far(const double xVers_0, const double xVers_1, const double xVers_2,
+template<int PS, int PT>
+void Solver<PS,PT>::HH_far(const double xVers_0, const double xVers_1, const double xVers_2,
             const double y_0, const double y_1, const double y_2,
             const double n_0, const double n_1, const double n_2,
             const double coupling_parameter, double wavenumber,
@@ -243,7 +245,8 @@ void Solver::HH_far(const double xVers_0, const double xVers_1, const double xVe
 
 }
 
-void Solver::fct_4(const double x1, const double x2, const double x3,
+template<int PS, int PT>
+void Solver<PS,PT>::fct_4(const double x1, const double x2, const double x3,
                                  const double y1, const double y2, const double y3,
                                  const double normal1, const double normal2, const double normal3,
                                  const double coupling_parameter, const double wavenumber,
@@ -269,7 +272,8 @@ void Solver::fct_4(const double x1, const double x2, const double x3,
 
 }
 
-void Solver::fac_1(const double distance, double wavenumber, std::complex<double>& sol) 
+template<int PS, int PT>
+void Solver<PS,PT>::fac_1(const double distance, double wavenumber, std::complex<double>& sol) 
 {
 
     const double re = std::cos(wavenumber * distance) / distance;

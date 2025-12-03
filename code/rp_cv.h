@@ -2,7 +2,6 @@
 #define RP_CV_H
 
 #include "global.h"
-#include "parameters.h"
 
 namespace {
     double TOL_PROJ_EDGE = 1.0E-10;

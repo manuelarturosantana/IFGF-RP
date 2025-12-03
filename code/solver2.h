@@ -9,9 +9,14 @@
 #include <algorithm>
 
 #include "rp_cv.h"
-#include "parametrization.h"
 
+#include "parametrization.h"
+// #include "BoxTreeWrapper.h"
 #include "BoxTree.h"
+
+// class BoxTreeBase; 
+// template <int PS, int PT> class BoxTree;
+
 
 #include "mkl.h"
 #include <omp.h>
@@ -48,6 +53,7 @@ struct InterpPatch {
 
 }; 
 
+template<int PS = 3, int PT = 5>
 class Solver 
 {
 
@@ -114,7 +120,8 @@ class Solver
 
         std::vector<long long> patch_num_coeffs_;
 
-        BoxTree boxes_;
+        BoxTree<PS, PT> boxes_;
+        // BoxTree boxes_;
 
         std::vector<long long> new_order_points_IFGF_;
         std::vector<long long> new_order_points_RP_;
@@ -395,7 +402,7 @@ class Solver
         const MPI_Comm& mpi_comm);
 
         void init_solver(const bool timing, 
-            const double k, MPI_Comm mpi_comm);
+            const double k, MPI_Comm mpi_comm = MPI_COMM_WORLD);
 
 
 
@@ -417,10 +424,14 @@ class Solver
 
         // }
 
-        ~Solver() {           
-
-        }    
+        ~Solver();  
 
 };
+
+#include "SolverImplementation/ConstructorsandSetup.tpp"
+#include "SolverImplementation/GreenFunctions.tpp"
+#include "SolverImplementation/IFGF.tpp"
+#include "SolverImplementation/RP.tpp"
+#include "SolverImplementation/SolveandEval.tpp"
 
 #endif

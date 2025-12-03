@@ -1,6 +1,7 @@
 #include "../solver2.h"
 
-void Solver::create_IFGF_object() 
+template<int PS, int PT>
+void Solver<PS,PT>::create_IFGF_object() 
 {
 
     boxes_.InitializeObject(disc_points_x_all_.begin(), disc_points_x_all_.end(),
@@ -16,7 +17,8 @@ void Solver::create_IFGF_object()
                             new_order_points_IFGF_, mpi_comm_);
 }
 
-void Solver::set_precomputations_data_IFGF()
+template<int PS, int PT>
+void Solver<PS,PT>::set_precomputations_data_IFGF()
 {
 
     std::unordered_map<long long, std::unordered_set<long long>> patch_to_sing_point;
@@ -269,7 +271,8 @@ void Solver::set_precomputations_data_IFGF()
 
 }
 
-void Solver::compute_new_order_points_RP() 
+template<int PS, int PT>
+void Solver<PS,PT>::compute_new_order_points_RP() 
 {
 
     std::vector<std::vector<long long>> points_not_in_rank(comm_size_), order_points_not_in_rank(comm_size_);
@@ -369,7 +372,8 @@ void Solver::compute_new_order_points_RP()
 
 }
 
-void Solver::check_patch_in_neighbours() 
+template<int PS, int PT>
+void Solver<PS,PT>::check_patch_in_neighbours() 
 {
 
     // Compute point to box

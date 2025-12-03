@@ -8,12 +8,15 @@
 #include <unordered_map>
 #include <algorithm>
 
+
 #include "SphericalCoordinates.h"
 
+template <int PS, int PT>
 class BoxTree;
 
 class Level {
-
+    
+    template <int PS, int PT>
     friend class BoxTree;
 
     private:

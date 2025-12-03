@@ -1,4 +1,6 @@
-#include "parametrization.h"
+#include <array>
+#include <cmath>
+
 
 void  parametrization_q(const double SPHERE_RADIUS, const std::array<double, 3>& SPHERE_CENTER,
     const double s, const double t, const int patch, double& x, double& y, double& z)

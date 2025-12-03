@@ -2,7 +2,6 @@
 #define PARAMETRIZATION_H
 
 #include <array>
-#include "parameters.h"
 
 // Parametrization for sphere
 

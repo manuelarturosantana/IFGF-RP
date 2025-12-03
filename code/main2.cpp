@@ -15,7 +15,10 @@ int main(int argc, char* argv[]) {
 
     try {
 
-        Solver new_object(1,0,0,0);
+        // Change the interpolation order
+        Solver<5,7> new_object(1,0,0,0);
+
+        // Solver new_object(1,0,0,0);
         double LAMBDA = 2.0 * 1 / 8.0; // 2.0 * M_PI / WAVE_NUMBER
         double WAVE_NUMBER = 2.0 * M_PI / LAMBDA;
 

@@ -1,6 +1,7 @@
 #include "../solver2.h"
 
- void Solver::compute_integral_acc(const std::complex<double>* phi,
+template<int PS, int PT>
+void Solver<PS, PT>::compute_integral_acc(const std::complex<double>* phi,
                                   const std::vector<std::complex<double>>& vec_coeffs,
                                   std::complex<double>* integral)
 {
@@ -51,7 +52,8 @@
 
 }
 
-void Solver::iterator_function_acc(std::complex<double>* phi, std::complex<double>* rhs)
+template<int PS, int PT>
+void Solver<PS,PT>::iterator_function_acc(std::complex<double>* phi, std::complex<double>* rhs)
 {
 
     std::unordered_map<long long, std::vector<std::complex<double>>> phi_not_in_rank;
@@ -80,7 +82,8 @@ void Solver::iterator_function_acc(std::complex<double>* phi, std::complex<doubl
 
 }
 
-void Solver::compute_phi_not_in_rank(const std::complex<double>* phi, std::unordered_map<long long, 
+template<int PS, int PT>
+void Solver<PS,PT>::compute_phi_not_in_rank(const std::complex<double>* phi, std::unordered_map<long long, 
     std::vector<std::complex<double>>>& phi_not_in_rank)
  {
 
@@ -248,7 +251,8 @@ void Solver::compute_phi_not_in_rank(const std::complex<double>* phi, std::unord
 
 }
 
-void Solver::iterator_function(std::complex<double>* phi, std::complex<double>* rhs)
+template<int PS, int PT>
+void Solver<PS,PT>::iterator_function(std::complex<double>* phi, std::complex<double>* rhs)
 {
 
     iterator_function_acc(phi, rhs);
@@ -260,7 +264,8 @@ struct UserContext{
     long long n;
 };
 
-PetscErrorCode Solver::iterator_function_2(Mat A, Vec x, Vec y)
+template<int PS, int PT>
+PetscErrorCode Solver<PS,PT>::iterator_function_2(Mat A, Vec x, Vec y)
 {
 
     PetscFunctionBeginUser;
@@ -293,7 +298,8 @@ PetscErrorCode Solver::iterator_function_2(Mat A, Vec x, Vec y)
 
 }
 
-std::vector<std::complex<double>> Solver::solve(const std::vector<std::complex<double>>& rhs)
+template<int PS, int PT>
+std::vector<std::complex<double>> Solver<PS,PT>::solve(const std::vector<std::complex<double>>& rhs)
 {
 
     KSP ksp;
@@ -368,10 +374,8 @@ std::vector<std::complex<double>> Solver::solve(const std::vector<std::complex<d
 
 }
 
-
-
-
-std::vector<std::complex<double>> Solver::compute_incident_field() 
+template<int PS, int PT>
+std::vector<std::complex<double>> Solver<PS,PT>::compute_incident_field() 
 {
 
     std::vector<std::complex<double>> u_inc(point_up_ - point_low_, 0);
@@ -434,8 +438,8 @@ std::vector<std::complex<double>> Solver::compute_incident_field()
 
 }        
 
-
-std::complex<double> Solver::compute_incident_field(double x, double y, double z) 
+template<int PS, int PT>
+std::complex<double> Solver<PS,PT>::compute_incident_field(double x, double y, double z) 
 {
 
     std::complex<double> u_inc = {0.0, 0.0};
@@ -476,8 +480,8 @@ std::complex<double> Solver::compute_incident_field(double x, double y, double z
 
 }     
 
-
-std::vector<std::complex<double>> Solver::solve_u_inc(bool timing) 
+template<int PS, int PT>
+std::vector<std::complex<double>> Solver<PS,PT>::solve_u_inc(bool timing) 
 {
     
     MPI_Barrier(mpi_comm_);
@@ -520,7 +524,8 @@ std::vector<std::complex<double>> Solver::solve_u_inc(bool timing)
 
 }
 
-void Solver::int_far_field(const double xVers_0, const double xVers_1, const double xVers_2,
+template<int PS, int PT>
+void Solver<PS,PT>::int_far_field(const double xVers_0, const double xVers_1, const double xVers_2,
                         const long long npatch, 
                         const std::complex<double>* phi,
                         std::complex<double>& solution)                      
@@ -571,7 +576,8 @@ void Solver::int_far_field(const double xVers_0, const double xVers_1, const dou
 
 }
 
- std::complex<double> Solver::compute_far_field_approx(const std::vector<std::complex<double>>& phi, 
+template<int PS, int PT>
+std::complex<double> Solver<PS,PT>::compute_far_field_approx(const std::vector<std::complex<double>>& phi, 
                                                       const double xVers_0, const double xVers_1, const double xVers_2) 
 {
     
@@ -598,7 +604,8 @@ void Solver::int_far_field(const double xVers_0, const double xVers_1, const dou
 
 }
 
-void Solver::int_near_field(const double x_0, const double x_1, const double x_2,
+template<int PS, int PT>
+void Solver<PS,PT>::int_near_field(const double x_0, const double x_1, const double x_2,
                             const long long npatch, 
                             const std::complex<double>* phi,
                             std::complex<double>& solution)
@@ -611,7 +618,8 @@ void Solver::int_near_field(const double x_0, const double x_1, const double x_2
 
 }
 
-std::complex<double> Solver::compute_near_field_approx(const std::vector<std::complex<double>>& phi, 
+template<int PS, int PT>
+std::complex<double> Solver<PS,PT>::compute_near_field_approx(const std::vector<std::complex<double>>& phi, 
                                                        const double x_0, const double x_1, const double x_2)
 {
     
@@ -636,7 +644,8 @@ std::complex<double> Solver::compute_near_field_approx(const std::vector<std::co
 
 } 
 
-std::complex<double> Solver::compute_far_field_exact(const double xVers_0, const double xVers_1, const double xVers_2)
+template<int PS, int PT>
+std::complex<double> Solver<PS,PT>::compute_far_field_exact(const double xVers_0, const double xVers_1, const double xVers_2)
  {
 
     std::complex<double> solution(0.0, 0.0);
@@ -680,7 +689,8 @@ std::complex<double> Solver::compute_far_field_exact(const double xVers_0, const
 
 }
 
-void Solver::compute_far_field_error(const bool timing, const std::vector<std::complex<double>>& phi)
+template<int PS, int PT>
+void Solver<PS,PT>::compute_far_field_error(const bool timing, const std::vector<std::complex<double>>& phi)
 {           
 
     MPI_Barrier(mpi_comm_);
@@ -822,7 +832,8 @@ void Solver::compute_far_field_error(const bool timing, const std::vector<std::c
 
 }
 
-void Solver::compute_near_field(const bool timing, const std::vector<std::complex<double>>& phi)
+template<int PS, int PT>
+void Solver<PS,PT>::compute_near_field(const bool timing, const std::vector<std::complex<double>>& phi)
 {
 
     const int nNearZones = N_NEAR_PTS.size();

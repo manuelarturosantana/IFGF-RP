@@ -2,73 +2,70 @@
 #define INTERPOLATOR_H
 
 #include "Chebyshev.h"
-#include "parameters.h"
 #include <complex>
 
-enum InterpolatorScheme 
-{
-    Chebyshev = 0
-};
 
-template <InterpolatorScheme scheme>
+template <int PS, int PT>
 class Interpolator
 {
 
     private:
 
-        static constexpr int Ps = PS;
-        static constexpr int Pang = PT;
+    //    int PS = PS;
+    //    int PT = PT;
 
-        const std::array<double, Ps> xs_;
-        const std::array<double, Pang> xang_;
+        const std::array<double, PS> xs_;
+        const std::array<double, PT> xang_;
 
-        const std::array<std::array<double, Ps>, Ps> Ts_; 
-        const std::array<std::array<double, Pang>, Pang> Tang_;
+        const std::array<std::array<double, PS>, PS> Ts_; 
+        const std::array<std::array<double, PT>, PT> Tang_;
 
         const int P_;
 
     public:
 
         constexpr Interpolator() : 
-            xs_(Functions::SetupChebyshevPoints<Ps>()),
-            xang_(Functions::SetupChebyshevPoints<Pang>()),
-            Ts_(Functions::SetupMultipleTn<Ps>()),
-            Tang_(Functions::SetupMultipleTn<Pang>()),
-            P_(Ps*Pang*Pang)
+            xs_(Functions::SetupChebyshevPoints<PS>()),
+            xang_(Functions::SetupChebyshevPoints<PT>()),
+            Ts_(Functions::SetupMultipleTn<PS>()),
+            Tang_(Functions::SetupMultipleTn<PT>()),
+            // PS(PS),
+            // PT(PT),
+            P_(PS*PT*PT)
         {
         }
 
         void GetInterpolationPoint(const int iter, double& x, double& y, double& z) const
         {
-            x = xs_[iter % Ps];
-            y = xang_[(iter / Ps) % Pang];
-            z = xang_[iter / (Ps*Pang)];
+            x = xs_[iter % PS];
+            y = xang_[(iter / PS) % PT];
+            z = xang_[iter / (PS*PT)];
         }
 
         constexpr int GetNInterpPoints() const {return P_;}
 
         constexpr int GetInterpId(const int is, const int itheta, const int iphi) const
         {
-            return ( iphi*Pang + itheta )*Ps + is;
+            return ( iphi*PT + itheta )*PS + is;
         }
 
         inline std::complex<double> Interpolate(const double x, const double y, const double z, const std::complex<double>* vals_begin) const
         {
-            static thread_local std::array<double, Ps> TargetTs; 
-            static thread_local std::array<double, Pang> TargetTphi;
-            static thread_local std::array<double, Pang> TargetTtheta;
+            static thread_local std::array<double, PS> TargetTs; 
+            static thread_local std::array<double, PT> TargetTphi;
+            static thread_local std::array<double, PT> TargetTtheta;
 
-            Functions::SetupMultipleTnArr<Ps>(x, TargetTs);
-            Functions::SetupMultipleTnArr<Pang>(y, TargetTtheta);
-            Functions::SetupMultipleTnArr<Pang>(z, TargetTphi);
+            Functions::SetupMultipleTnArr<PS>(x, TargetTs);
+            Functions::SetupMultipleTnArr<PT>(y, TargetTtheta);
+            Functions::SetupMultipleTnArr<PT>(z, TargetTphi);
 
             std::complex<double> result = {0.0, 0.0};
             
-            for (int sangiter2 = 0; sangiter2 < Pang; sangiter2++) {
-                for (int sangiter1 = 0; sangiter1 < Pang; sangiter1++) {
-                    for (int sraditer = 0; sraditer < Ps; sraditer++) {
+            for (int sangiter2 = 0; sangiter2 < PT; sangiter2++) {
+                for (int sangiter1 = 0; sangiter1 < PT; sangiter1++) {
+                    for (int sraditer = 0; sraditer < PS; sraditer++) {
                 
-                        const long long liniter = (static_cast<long long>(sangiter2)*Pang + sangiter1)*Ps + sraditer;
+                        const long long liniter = (static_cast<long long>(sangiter2)*PT + sangiter1)*PS + sraditer;
                         const double cheb = TargetTphi[sangiter2]*TargetTtheta[sangiter1]*TargetTs[sraditer];                
                 
                         result += std::complex<double>(cheb * vals_begin[liniter].real(), cheb * vals_begin[liniter].imag());
@@ -81,13 +78,13 @@ class Interpolator
 
         void GenerateInterpolant(std::complex<double>* const arr) const
         {
-            static thread_local std::array<std::array<std::array<std::complex<double>, Pang>, Pang>, Ps> Fijo;
-            static thread_local std::array<std::array<std::array<std::complex<double>, Pang>, Pang>, Ps> Gino;
+            static thread_local std::array<std::array<std::array<std::complex<double>, PT>, PT>, PS> Fijo;
+            static thread_local std::array<std::array<std::array<std::complex<double>, PT>, PT>, PS> Gino;
 
             #pragma unenroll
-            for (int i = 0; i < Ps; i++) {
-                for (int j = 0; j < Pang; j++) {
-                    for (int o = 0; o < Pang; o++) {
+            for (int i = 0; i < PS; i++) {
+                for (int j = 0; j < PT; j++) {
+                    for (int o = 0; o < PT; o++) {
                         Fijo[i][j][o] = {0.0, 0.0};
                         Gino[i][j][o] = {0.0, 0.0};
                     }
@@ -95,10 +92,10 @@ class Interpolator
             }
 
             #pragma unenroll
-            for (int i = 0; i < Ps; i++) {
-                for (int j = 0; j < Pang; j++) {
-                    for (int o = 0; o < Pang; o++) {
-                        for (int k = 0; k < Pang; k++) {
+            for (int i = 0; i < PS; i++) {
+                for (int j = 0; j < PT; j++) {
+                    for (int o = 0; o < PT; o++) {
+                        for (int k = 0; k < PT; k++) {
                             Fijo[i][j][o] += std::complex<double>(arr[GetInterpId(i, j, k)].real()*Tang_[o][k], arr[GetInterpId(i, j, k)].imag()*Tang_[o][k]);
                         }
                     }
@@ -106,10 +103,10 @@ class Interpolator
             }
 
             #pragma unenroll
-            for (int i = 0; i < Ps; i++) {
-                for (int n = 0; n < Pang; n++) {
-                    for (int o = 0; o < Pang; o++) {
-                        for (int j = 0; j < Pang; j++) {
+            for (int i = 0; i < PS; i++) {
+                for (int n = 0; n < PT; n++) {
+                    for (int o = 0; o < PT; o++) {
+                        for (int j = 0; j < PT; j++) {
                             Gino[i][n][o] += std::complex<double>(Fijo[i][j][o].real()*Tang_[n][j], Fijo[i][j][o].imag()*Tang_[n][j]);
                         }
                     }
@@ -122,11 +119,11 @@ class Interpolator
             }
 
             #pragma unenroll
-            for (int m = 0; m < Ps; m++) {
-                for (int n = 0; n < Pang; n++) {
-                    for (int o = 0; o < Pang; o++) {
+            for (int m = 0; m < PS; m++) {
+                for (int n = 0; n < PT; n++) {
+                    for (int o = 0; o < PT; o++) {
                         const int id = GetInterpId(m, n, o);
-                        for (int i = 0; i < Ps; i++) {
+                        for (int i = 0; i < PS; i++) {
                             arr[id] += std::complex<double>(Gino[i][n][o].real()*Ts_[m][i], Gino[i][n][o].imag()*Ts_[m][i]);
                         }
                         double alphan = 2.0;
@@ -135,7 +132,7 @@ class Interpolator
                         if (n == 0) alphan = 1.0;
                         if (m == 0) alpham = 1.0;
                         if (o == 0) alphao = 1.0;
-                        arr[id] = {arr[id].real()*alpham*alphan*alphao/(Ps*Pang*Pang), arr[id].imag()*alpham*alphan*alphao/(Ps*Pang*Pang)};
+                        arr[id] = {arr[id].real()*alpham*alphan*alphao/(PS*PT*PT), arr[id].imag()*alpham*alphan*alphao/(PS*PT*PT)};
                     }
                 }
             }

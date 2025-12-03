@@ -3,7 +3,8 @@
 #include <filesystem> // Required for std::filesystem
 #include <algorithm>  // Required for std::count_if
 
-void Solver::compute_parallel_parameters()
+template<int PS, int PT>
+void Solver<PS,PT>::compute_parallel_parameters()
 {
 
     int flag;
@@ -75,7 +76,8 @@ void Solver::compute_parallel_parameters()
     
 }
 
-void Solver::load_interpolated_surface() 
+template<int PS, int PT>
+void Solver<PS,PT>::load_interpolated_surface() 
 {
     
     #pragma omp parallel for
@@ -227,7 +229,8 @@ void Solver::load_interpolated_surface()
 
 }
 
-void Solver::compute_fejer_nodes_and_weights()
+template<int PS, int PT>
+void Solver<PS,PT>::compute_fejer_nodes_and_weights()
 {
 
     fejer_nodes_u_int_ = std::vector<double>(Nu_int_);
@@ -259,7 +262,8 @@ void Solver::compute_fejer_nodes_and_weights()
 
 }
 
-void Solver::compute_chebyshev_evaluations()
+template<int PS, int PT>
+void Solver<PS,PT>::compute_chebyshev_evaluations()
 {
 
     Tn_ = std::vector<std::complex<double>>(Nu_int_*Nu_int_);
@@ -270,7 +274,8 @@ void Solver::compute_chebyshev_evaluations()
 
 }   
 
-void Solver::compute_flags_domain() 
+template<int PS, int PT>
+void Solver<PS,PT>::compute_flags_domain() 
 {
 
     const long long num_patches = patch_up_ - patch_low_;
@@ -327,7 +332,8 @@ void Solver::compute_flags_domain()
 
 }
 
-void Solver::compute_discretization_domain() 
+template<int PS, int PT>
+void Solver<PS,PT>::compute_discretization_domain() 
 {
 
     const long long num_points = point_up_ - point_low_;
@@ -481,7 +487,8 @@ void Solver::compute_discretization_domain()
 
 }
 
-void Solver::compute_coupling_parameter() 
+template<int PS, int PT>
+void Solver<PS,PT>::compute_coupling_parameter() 
 {
 
     double loc_max_x = std::numeric_limits<double>::lowest();
@@ -533,8 +540,8 @@ void Solver::compute_coupling_parameter()
 
 }
 
-
-void Solver::compute_near_singular_patches_estimate()
+template<int PS, int PT>
+void Solver<PS,PT>::compute_near_singular_patches_estimate()
 {
 
     std::vector<double> x_min(patch_up_ - patch_low_, std::numeric_limits<double>::max());
@@ -1270,7 +1277,8 @@ void Solver::compute_near_singular_patches_estimate()
             
 }
 
-void Solver::setup(bool timing)
+template<int PS, int PT>
+void Solver<PS,PT>::setup(bool timing)
 {
 
     MPI_Barrier(MPI_COMM_WORLD);
@@ -1492,8 +1500,8 @@ void Solver::setup(bool timing)
 
 }
 
-
-Solver::Solver(
+template<int PS, int PT>
+Solver<PS,PT>::Solver(
         double sphere_radius,
         double sphere_centerX, double sphere_centerY, double sphere_centerZ)
 {
@@ -1510,8 +1518,8 @@ Solver::Solver(
 }
 
 
-
-Solver::Solver( const std::string directory,
+template<int PS, int PT>
+Solver<PS,PT>::Solver( const std::string directory,
                 const std::string file_prefix)
 {
 
@@ -1543,9 +1551,9 @@ Solver::Solver( const std::string directory,
                
 }
 
-void Solver::init_solver(const bool timing, const double k, MPI_Comm mpi_comm)  {
-
-
+template<int PS, int PT>
+void Solver<PS,PT>::init_solver(const bool timing, const double k, MPI_Comm mpi_comm)  
+{
 
     WAVE_NUMBER = k;
     mpi_comm_   = mpi_comm;
@@ -1560,4 +1568,7 @@ void Solver::init_solver(const bool timing, const double k, MPI_Comm mpi_comm)  
 
 }
 
+template<int PS, int PT>
+Solver<PS,PT>::~Solver() {           
 
+}    

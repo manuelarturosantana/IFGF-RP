@@ -14,8 +14,10 @@
 #include "mpi.h"
 
 #include "Level.h"
-#include "parameters.h"
+
 #include "Interpolator.h"
+
+#include "solver2.h"
 
 #include "global.h"
 
@@ -28,10 +30,11 @@
 #include <cstring>
 
 class Level;
+
+template <int PS, int PT>
 class BoxTree;
 
-const Interpolator<Chebyshev> IPSCHEME_;
-
+template <int PS, int PT>
 class BoxTree 
 {
 
@@ -83,6 +86,8 @@ class BoxTree
         int P_;
 
         long long max_elems_level_D_;
+
+        Interpolator<PS, PT> IPSCHEME_;
 
     private:
 
@@ -3353,5 +3358,6 @@ class BoxTree
         }
 
 };
+
 
 #endif
