@@ -150,8 +150,8 @@ void Solver::beta(const double r_0, const double r_1, const double r_2,
 
     std::vector<std::complex<double>> Tn_mat(Nu_prec_*Nu_int_), Tm_mat(Nv_prec_*Nv_int_);
     
-    cheb_evals<Nu_prec_, Nu_int_>(ui, Tn_mat);
-    cheb_evals<Nv_prec_, Nv_int_>(vj, Tm_mat);
+    cheb_evals(ui, Tn_mat, Nu_prec_, Nu_int_);
+    cheb_evals(vj, Tm_mat, Nv_prec_, Nv_int_);
 
     std::vector<std::complex<double>> matprod1(Nv_prec_*Nu_int_, {0.0, 0.0});
 

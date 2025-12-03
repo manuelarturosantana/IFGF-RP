@@ -11,6 +11,7 @@
 #include "edge_cv.h"
 #include "rp_cv.h"
 #include "parametrization.h"
+#include "GreenFunctions.hpp"
 
 #include "BoxTree.h"
 
@@ -27,245 +28,7 @@
 
 
 
-inline void HH(
-    const double p1x, const double p1y, const double p1z,
-    const double p2x, const double p2y, const double p2z,
-    const double nx, const double ny, const double nz,
-    const double dxdsx, const double dxdsy, const double dxdsz,
-    const double dxdtx, const double dxdty, const double dxdtz,
-    const double dxdsdsx, const double dxdsdsy, const double dxdsdsz,
-    const double dxdsdtx, const double dxdsdty, const double dxdsdtz,
-    const double dxdtdtx, const double dxdtdty, const double dxdtdtz,
-    const double coupling_parameter, double WAVE_NUMBER, int EQUATION_FORMULATION,
-    std::complex<double>& solution)
-{
-    
-    const double INV_4_PI = 1.0 / (4.0 * M_PI);
 
-    const double dx = p2x - p1x;
-    const double dy = p2y - p1y;
-    const double dz = p2z - p1z;
-    
-    const double norm_diff_sq = dx * dx + dy * dy + dz * dz;
-
-    if (norm_diff_sq < 1e-20) { 
-
-        solution = std::complex<double>(0.0, 0.0);
-        return;
-
-    } else {
-        
-        const double norm_diff = std::sqrt(norm_diff_sq);
-        const double inv_norm_diff = 1.0 / norm_diff;
-        const double inv_norm_diff_sq = inv_norm_diff * inv_norm_diff;
-
-        const double val_cos = std::cos(WAVE_NUMBER * norm_diff);
-        const double val_sin = std::sin(WAVE_NUMBER * norm_diff);
-
-        double solution_real, solution_imag;
-        
-        switch (EQUATION_FORMULATION) {
-            
-            case 1: {
-
-                solution_real = val_cos * INV_4_PI * inv_norm_diff;
-                solution_imag = val_sin * INV_4_PI * inv_norm_diff;
-                break;
-
-            }
-
-            case 2: {
-                
-                // Compute beta = < r, n > * |r|^-2
-
-                const double rDotNorm = dx * nx + dy * ny + dz * nz;
-                double beta = rDotNorm * inv_norm_diff_sq;
-
-                if ((norm_diff_sq < 1.0E-10) && (std::abs(rDotNorm) < 1.0E-6)) {
-
-                    beta = -beta_double_layer_close(p1x, p1y, p1z, p2x, p2y, p2z, 
-                                nx, ny, nz, dxdsx, dxdsy, dxdsz, 
-                                dxdtx, dxdty, dxdtz, dxdsdsx, dxdsdsy, dxdsdsz, 
-                                dxdsdtx, dxdsdty, dxdsdtz, dxdtdtx, dxdtdty, dxdtdtz);
-
-                }
-                
-                const double term1 = val_cos * inv_norm_diff;
-                const double term2 = WAVE_NUMBER * val_sin;
-                
-                solution_real = -INV_4_PI * beta * (term1 + term2);
-
-                const double term3 = val_sin * inv_norm_diff;
-                const double term4 = WAVE_NUMBER * val_cos;
-                
-                solution_imag = -INV_4_PI * beta * (term3 - term4);
-                break;
-
-            }
-            
-            case 3: {
-
-                const double solution_real_S = val_cos * INV_4_PI * inv_norm_diff;
-                const double solution_imag_S = val_sin * INV_4_PI * inv_norm_diff;
-
-                const double rDotNorm = dx * nx + dy * ny + dz * nz;
-                double beta = rDotNorm * inv_norm_diff_sq;
-
-                if ((norm_diff_sq < 1.0E-10) && (std::abs(rDotNorm) < 1.0E-6)) {
-
-                    beta = -beta_double_layer_close(p1x, p1y, p1z, p2x, p2y, p2z, 
-                                nx, ny, nz, dxdsx, dxdsy, dxdsz, 
-                                dxdtx, dxdty, dxdtz, dxdsdsx, dxdsdsy, dxdsdsz, 
-                                dxdsdtx, dxdsdty, dxdsdtz, dxdtdtx, dxdtdty, dxdtdtz);
-
-                }
-
-                const double term1 = val_cos * inv_norm_diff;
-                const double term2 = WAVE_NUMBER * val_sin;
-                const double solution_real_D = -INV_4_PI * beta * (term1 + term2);
-
-                const double term3 = val_sin * inv_norm_diff;
-                const double term4 = WAVE_NUMBER * val_cos;
-                const double solution_imag_D = -INV_4_PI * beta * (term3 - term4);
-
-                solution_real = solution_real_D + coupling_parameter * solution_imag_S;
-                solution_imag = solution_imag_D - coupling_parameter * solution_real_S;
-
-                break;
-
-            }
-
-            default: {
-                
-                solution_real = 0.0;
-                solution_imag = 0.0;
-                break;
-
-            }
-
-        }
-
-        solution = std::complex<double>{solution_real, solution_imag};
-
-    }
-
-}
-
-inline void HH2(const double p1x, const double p1y, const double p1z,
-         const double p2x, const double p2y, const double p2z,
-         const double nx, const double ny, const double nz,
-         double coupling_parameter, double WAVE_NUMBER, int EQUATION_FORMULATION,
-         std::complex<double>& solution)
-{
-
-    double solution_real, solution_imag;
-
-    const double norm_diff = std::sqrt((p2x - p1x)*(p2x - p1x) + (p2y - p1y)*(p2y - p1y) + (p2z - p1z)*(p2z - p1z));
-
-    if (norm_diff < 1e-14) {
-
-        solution_real = 0.0;
-        solution_imag = 0.0;
-
-    } else {   
-
-        const double val_cos = std::cos(WAVE_NUMBER * norm_diff);
-        const double val_sin = std::sin(WAVE_NUMBER * norm_diff);
-
-        if (EQUATION_FORMULATION == 1) {
-
-            solution_real = val_cos / (4.0 * M_PI * norm_diff);
-            solution_imag = val_sin / (4.0 * M_PI * norm_diff);
-
-        } else if (EQUATION_FORMULATION == 2) {
-
-            // Compute beta = < r, n > / |r|^2
-            
-            const double rDotNorm = (p2x - p1x) * nx + (p2y - p1y) * ny + (p2z - p1z) * nz;
-            double beta = rDotNorm / (norm_diff * norm_diff);
-
-            solution_real = -(1.0 / (4.0 * M_PI)) * beta * (val_cos / norm_diff + WAVE_NUMBER * val_sin);
-            solution_imag = -(1.0 / (4.0 * M_PI)) * beta * (val_sin / norm_diff - WAVE_NUMBER * val_cos);        
-
-            if (USE_ACCELERATOR) {
-
-                solution_real *= -1.0;
-                solution_imag *= -1.0;
-
-            }
-
-        } else {
-
-            // EQUATION_FORMULATION == 3 
-
-            const double solution_real_S = val_cos / (4.0 * M_PI * norm_diff);
-            const double solution_imag_S = val_sin / (4.0 * M_PI * norm_diff);
-
-            // Compute beta = < r, n > / |r|^2
-
-            const double rDotNorm = (p2x - p1x) * nx + (p2y - p1y) * ny + (p2z - p1z) * nz;
-            double beta = rDotNorm / (norm_diff * norm_diff);
-
-            double solution_real_D = -(1.0 / (4.0 * M_PI)) * beta * (val_cos / norm_diff + WAVE_NUMBER * val_sin);
-            double solution_imag_D = -(1.0 / (4.0 * M_PI)) * beta * (val_sin / norm_diff - WAVE_NUMBER * val_cos);        
-
-            if (USE_ACCELERATOR) {
-
-                solution_real_D *= -1.0;
-                solution_imag_D *= -1.0;
-
-            }
-
-            solution_real = solution_real_D + coupling_parameter * solution_imag_S;
-            solution_imag = solution_imag_D - coupling_parameter * solution_real_S;
-
-        }
-
-        solution = std::complex<double>{solution_real, solution_imag};
-
-    }
-
-}
-
-inline void HH_far(const double xVers_0, const double xVers_1, const double xVers_2,
-            const double y_0, const double y_1, const double y_2,
-            const double n_0, const double n_1, const double n_2,
-            const double coupling_parameter, double WAVE_NUMBER, int EQUATION_FORMULATION,
-            std::complex<double>& solution)
-{
-
-    double solution_real, solution_imag;
-
-    const double inner_prod = - WAVE_NUMBER * (xVers_0 * y_0 + xVers_1 * y_1 + xVers_2 * y_2);
-    const double inner_prod_2 = - WAVE_NUMBER * (xVers_0 * n_0 + xVers_1 * n_1 + xVers_2 * n_2);
-
-    const double S_real = std::cos(inner_prod);
-    const double S_imag = std::sin(inner_prod);
-    const double D_real = -inner_prod_2 * S_imag;
-    const double D_imag = inner_prod_2 * S_real;
-
-    if (EQUATION_FORMULATION == 1) {
-
-        solution_real = S_real;
-        solution_imag = S_imag;
-
-    } else if (EQUATION_FORMULATION == 2) {
-
-        solution_real = D_real;
-        solution_imag = D_imag;
-
-    } else {
-
-        // EQUATION_FORMULATION == 3
-
-        solution_real = D_real + coupling_parameter * S_imag;
-        solution_imag = D_imag - coupling_parameter * S_real;
-
-    } 
-
-    solution = std::complex<double>{solution_real, solution_imag};
-
-}
 
 struct InterpPatch {
 
@@ -296,10 +59,9 @@ class Solver
     private:
 
         // TODO: MOVE THESE to the initialization
-        static constexpr long long Nu_int_ = N_PTS_PER_PATCH[0], Nv_int_ = N_PTS_PER_PATCH[1];
-        static constexpr long long Nu_prec_ = N_PTS_SING_INT[0], Nv_prec_ = N_PTS_SING_INT[1];
+        long long Nu_int_, Nv_int_, Nu_prec_, Nv_prec_;
 
-        static constexpr long long Q_ = N_PATCHES_ORIG, Qx_ = N_SPLIT_PER_PATCH[0], Qy_ = N_SPLIT_PER_PATCH[1];
+        long long Q_, Qx_, Qy_;
 
         std::unordered_map<long long, InterpPatch> interp_surface_;
 
@@ -314,6 +76,8 @@ class Solver
 
         int world_rank_;
         int world_size_;
+
+        MPI_Comm mpi_comm_;
 
         std::vector<long long> split_points_;
         std::vector<long long> split_points_2_;
@@ -410,22 +174,17 @@ class Solver
         // Sphere = 0
         // Others = 1
 
-        const int GEOMETRY = 0;
+        int GEOMETRY = 0;
 
         // Sphere
-        const double SPHERE_RADIUS = 1.0;
+        double SPHERE_RADIUS = 1.0;
         std::array<double,3> SPHERE_CENTER = {0.0, 0.0, 0.0};
-        // constexpr long long N_PATCHES_ORIG = 6;
-        const bool EDGE_FLAG_U_A[N_PATCHES_ORIG] = {false};
-        const bool EDGE_FLAG_U_B[N_PATCHES_ORIG] = {false};
-        const bool EDGE_FLAG_V_A[N_PATCHES_ORIG] = {false};
-        const bool EDGE_FLAG_V_B[N_PATCHES_ORIG] = {false};
 
         // Currently edge geometries are unsupported
-        // std::vector<bool> EDGE_FLAG_U_A;
-        // std::vector<bool> EDGE_FLAG_U_B;
-        // std::vector<bool> EDGE_FLAG_V_A;
-        // std::vector<bool> EDGE_FLAG_V_B;
+        std::vector<bool> EDGE_FLAG_U_A;
+        std::vector<bool> EDGE_FLAG_U_B;
+        std::vector<bool> EDGE_FLAG_V_A;
+        std::vector<bool> EDGE_FLAG_V_B;
 
         std::string DIRECTORY = "";
         std::string FILE_NAME = "";
@@ -530,11 +289,11 @@ class Solver
         }
 
         // TODO: 
-        inline void static fac_1(const double distance, double WAVE_NUMBER, std::complex<double>& sol)
+        inline void static fac_1(const double distance, double wavenumber, std::complex<double>& sol)
         {
 
-            const double re = std::cos(WAVE_NUMBER * distance) / distance;
-            const double im = std::sin(WAVE_NUMBER * distance) / distance;
+            const double re = std::cos(wavenumber * distance) / distance;
+            const double im = std::sin(wavenumber * distance) / distance;
 
             sol = {re, im};
 
@@ -610,12 +369,37 @@ class Solver
         void compute_near_field(const bool timing, const std::vector<std::complex<double>>& phi); // SolveandEval.cpp 
        
 
-        Solver(bool timing)
-        {
+        void init_solver(const bool timing, 
+        const std::complex<double> k, 
+        const int* n_pts_per_patch,
+        const int* n_split_per_patch,
+        const int* n_pts_sing_int,
+        const double proximity_box_size,
+        const int n_levels_IFGF, 
+        const MPI_Comm& mpi_comm);
 
-            setup(timing);
+        void init_solver(const bool timing, 
+            const double k);
 
-        }
+
+
+        // Constructor for the sphere
+        Solver(double sphere_radius = 1.0,
+               double sphere_centerX = 0.0, double sphere_centerY = 0.0, double sphere_centerZ = 0.0);
+
+        // Constructor for other geometries. This assumes that all files for a certain
+        // geometry live in one directory, and that they are the only files in that directory
+        // Files should be named "file_prefix1,file_prefix2, etc";
+        Solver( const std::string directory,
+                const std::string file_prefix);
+
+
+        // Solver(bool timing)
+        // {
+
+        //     setup(timing);
+
+        // }
 
         ~Solver() {           
 

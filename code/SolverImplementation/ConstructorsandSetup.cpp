@@ -1,5 +1,8 @@
 #include "../solver2.h"
 
+#include <filesystem> // Required for std::filesystem
+#include <algorithm>  // Required for std::count_if
+
 void Solver::compute_parallel_parameters()
 {
 
@@ -239,10 +242,10 @@ void Solver::compute_fejer_nodes_and_weights()
     fejer_nodes_v_prec_ = std::vector<double>(Nv_prec_);
     fejer_weights_v_prec_ = std::vector<double>(Nv_prec_);
 
-    fejerquadrature1<Nu_int_>(fejer_nodes_u_int_, fejer_weights_u_int_);
-    fejerquadrature1<Nv_int_>(fejer_nodes_v_int_, fejer_weights_v_int_);
-    fejerquadrature1<Nu_prec_>(fejer_nodes_u_prec_, fejer_weights_u_prec_);
-    fejerquadrature1<Nv_prec_>(fejer_nodes_v_prec_, fejer_weights_v_prec_);
+    fejerquadrature1(fejer_nodes_u_int_, fejer_weights_u_int_, Nu_int_);
+    fejerquadrature1(fejer_nodes_v_int_, fejer_weights_v_int_, Nv_int_);
+    fejerquadrature1(fejer_nodes_u_prec_, fejer_weights_u_prec_, Nu_prec_);
+    fejerquadrature1(fejer_nodes_v_prec_, fejer_weights_v_prec_, Nv_prec_);
 
     fejer_weights_u_v_int_ = std::vector<double>(Nu_int_*Nv_int_);
     
@@ -262,8 +265,8 @@ void Solver::compute_chebyshev_evaluations()
     Tn_ = std::vector<std::complex<double>>(Nu_int_*Nu_int_);
     Tm_ = std::vector<std::complex<double>>(Nv_int_*Nv_int_);
 
-    cheb_evals<Nu_int_, Nu_int_>(fejer_nodes_u_int_, Tn_);
-    cheb_evals<Nv_int_, Nv_int_>(fejer_nodes_v_int_, Tm_); 
+    cheb_evals(fejer_nodes_u_int_, Tn_, Nu_int_, Nu_int_);
+    cheb_evals(fejer_nodes_v_int_, Tm_, Nv_int_, Nv_int_); 
 
 }   
 
@@ -931,17 +934,6 @@ void Solver::compute_near_singular_patches_estimate()
         const long long num_points = Nu_int_ * Nv_int_;
         const long long num_patches = patch_up_ - patch_low_;
 
-        struct PatchData {
-
-            int flag_u;
-            int flag_v;
-            double x[Nu_int_*Nv_int_];
-            double y[Nu_int_*Nv_int_];
-            double z[Nu_int_*Nv_int_];
-            double dsdtjac[Nu_int_*Nv_int_];
-
-        };
-
         const size_t elems_per_patch = 2 + 4 * num_points;
         const size_t bytes_per_patch = sizeof(int) * 2 + sizeof(double) * 4 * num_points;
     
@@ -1500,5 +1492,69 @@ void Solver::setup(bool timing)
 
 }
 
+
+Solver::Solver(
+        double sphere_radius,
+        double sphere_centerX, double sphere_centerY, double sphere_centerZ)
+{
+
+    SPHERE_RADIUS = sphere_radius;
+    SPHERE_CENTER[0] = sphere_centerX; SPHERE_CENTER[1] = sphere_centerY; SPHERE_CENTER[2] = sphere_centerZ;
+    // Q_ is the number of patches before splitting.
+    Q_ = 6;
+    EDGE_FLAG_U_A = std::vector<bool>(Q_, false);
+    EDGE_FLAG_U_B = std::vector<bool>(Q_, false);
+    EDGE_FLAG_V_A = std::vector<bool>(Q_, false);
+    EDGE_FLAG_V_B = std::vector<bool>(Q_, false);
+
+}
+
+
+
+Solver::Solver( const std::string directory,
+                const std::string file_prefix)
+{
+
+    DIRECTORY = directory;
+    FILE_NAME = file_prefix;
+    Q_ = 0;
+
+    GEOMETRY = 1;
+
+     try {
+        // Create a directory_iterator for the specified path
+        std::filesystem::directory_iterator dirIter(DIRECTORY);
+
+        // Count regular files using std::count_if and a lambda expression
+        Q_ = std::count_if(begin(dirIter), end(dirIter),
+                                      [](const std::filesystem::directory_entry& entry) {
+                                          return entry.is_regular_file();
+                                      });
+
+    } catch (const std::filesystem::filesystem_error& ex) {
+        std::cerr << "Error accessing directory: " << ex.what() << std::endl;
+        
+    }
+
+    EDGE_FLAG_U_A = std::vector<bool>(Q_, false);
+    EDGE_FLAG_U_B = std::vector<bool>(Q_, false);
+    EDGE_FLAG_V_A = std::vector<bool>(Q_, false);
+    EDGE_FLAG_V_B = std::vector<bool>(Q_, false);
+               
+}
+
+void Solver::init_solver(const bool timing, const double k) {
+
+    WAVE_NUMBER = k;
+    
+    Nu_int_ = N_PTS_PER_PATCH[0]; Nv_int_ = N_PTS_PER_PATCH[1];
+    Nu_prec_ = N_PTS_SING_INT[0]; Nv_prec_ = N_PTS_SING_INT[1];
+    
+    Qx_ = N_SPLIT_PER_PATCH[0], Qy_ = N_SPLIT_PER_PATCH[1];
+
+
+    setup(timing);
+
+}
 
 

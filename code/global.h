@@ -77,9 +77,7 @@ inline double ab2cd(const double a, const double b, const double c, const double
 }
 
 // Fejer 1st quadrature rule
-
-template <int N>
-inline void fejerquadrature1(std::vector<double>& nodes, std::vector<double>& weights)
+inline void fejerquadrature1(std::vector<double>& nodes, std::vector<double>& weights, int N)
 {
 
     for (int i = 0; i < N; i++) {
@@ -145,8 +143,7 @@ inline double fun_dw(double p, double tau)
 
 // Chebyshev evaluations
 
-template<int N, int M>
-inline void cheb_evals(const std::vector<double>& x, std::vector<std::complex<double>>& evals)
+inline void cheb_evals(const std::vector<double>& x, std::vector<std::complex<double>>& evals, int N, int M)
 {
 
     if (M == 1) {

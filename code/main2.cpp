@@ -15,7 +15,11 @@ int main(int argc, char* argv[]) {
 
     try {
 
-        Solver new_object(true);
+        Solver new_object(1,0,0,0);
+        double LAMBDA = 2.0 * 1 / 8.0; // 2.0 * M_PI / WAVE_NUMBER
+        double WAVE_NUMBER = 2.0 * M_PI / LAMBDA;
+
+        new_object.init_solver(true, WAVE_NUMBER);
 
         PetscErrorCode ierr;  
 
