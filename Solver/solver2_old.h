@@ -11,6 +11,7 @@
 #include "rp_cv.h"
 #include "parametrization.h"
 
+
 #include <unsupported/Eigen/IterativeSolvers>
 #include "LinearOperator.h"
 #include "opGMRES.h"
@@ -54,8 +55,7 @@
  * 
  */
 
-
-using namespace Eigen;
+ using namespace Eigen;
 
 int inline G_SEARCH_MAX_ITER = 50;
 double inline G_SEARCH_TOL = 1E-12;
@@ -262,16 +262,14 @@ class Solver
 
         void compute_chebyshev_evaluations();
         
-        void compute_flags_domain();
+        void compute_flags_domain(); // Change
 
-        void compute_discretization_domain();
-        
-        // Function to write the points used in the discretization to files for density 
-        // visualization
+        void compute_discretization_domain(); // Change
+  
 
-        void compute_coupling_parameter();
+        void compute_coupling_parameter(); // Change
 
-        void compute_near_singular_patches_estimate();
+        void compute_near_singular_patches_estimate(); // Change
 
         void beta(const double r_0, const double r_1, const double r_2,
                   const long long q, const int flag_u_loc, const int flag_v_loc, 
@@ -279,13 +277,13 @@ class Solver
                   const double ubar_loc, const double vbar_loc,
                   std::vector<std::complex<double>>& prec);
         
-        void compute_precomputations();
+        void compute_precomputations(); // Change
 
         void get_coeffs(const long long q, const std::complex<double>* phi,
-                        std::complex<double>* coeffs);
+                        std::complex<double>* coeffs); // Change
        
         void compute_coeffs(const VectorXcd& phi,
-                            std::vector<std::complex<double>>& vec_coeffs);
+                            std::vector<std::complex<double>>& vec_coeffs); // Change
 
         void int_near(const std::complex<double>* coeffs,
                       const std::complex<double>* precomputations,
@@ -297,33 +295,34 @@ class Solver
                      std::complex<double>& solution);
     
         void compute_integral(const VectorXcd& phi, const std::vector<std::complex<double>>& vec_coeffs,
-                              VectorXcd& integral);
+                              VectorXcd& integral); // Eigen
      
 
         void iterator_function_unacc(const VectorXcd& phi,
-                                     VectorXcd& rhs);
+                                     VectorXcd& rhs); // Eigen
         
         // Function which chooses the smallest box size possible (number of levels), while
         // still satifying the necessary IFGF assumption
-        void setup_IFGF_choose_levels();
+        void setup_IFGF_choose_levels(); // Delete
 
-        void create_IFGF_object(); 
+        void create_IFGF_object(); // Change
         
-        void compute_new_order_points_RP();
+        void compute_new_order_points_RP(); // Change
 
-        bool check_patch_in_neighbours();
+        bool check_patch_in_neighbours(); // Change
 
-        void initialize_indexes_HO();
+        void initialize_indexes_HO(); // Change 
+
         void compute_intensities_patch(const long long npatch,
                                        const std::complex<double>* phi,
-                                       std::complex<double>* intensities);
+                                       std::complex<double>* intensities); // Change
 
         void compute_intensities(const VectorXcd& phi,
-                                 std::vector<std::complex<double>>& intensities);
+                                 std::vector<std::complex<double>>& intensities); // Eigen
        
 
         void compute_integral_acc(const VectorXcd& phi, const std::vector<std::complex<double>>& vec_coeffs,
-                                  VectorXcd& integral);
+                                  VectorXcd& integral); // Eigen
        
         
         
@@ -363,75 +362,75 @@ class Solver
         
         
         void iterator_function_acc(const VectorXcd& phi,
-                                   VectorXcd& rhs);
+                                   VectorXcd& rhs); //Change
        
-        void create_fftw_objects();
+        void create_fftw_objects(); // Delete
        
-        void compute_oversampling_M1(const std::vector<double>& psi, std::vector<double>& psi_overs);
+        void compute_oversampling_M1(const std::vector<double>& psi, std::vector<double>& psi_overs); // Change
        
 
-        void compute_oversampling_M2(const std::vector<double>& psi, std::vector<double>& psi_overs); 
+        void compute_oversampling_M2(const std::vector<double>& psi, std::vector<double>& psi_overs); // Delete
         
-        void compute_singular_points();
+        void compute_singular_points(); // Change
         
         void int_near_overs(const double r_0, const double r_1, const double r_2,
                             const long long q, const int flag_u_loc, const int flag_v_loc, 
                             const double u_a_loc, const double u_b_loc, const double v_a_loc, const double v_b_loc,
                             const double ubar_loc, const double vbar_loc,
                             const double* psi_overs,
-                            std::complex<double>& solution); 
+                            std::complex<double>& solution);  // Change
         
 
-        void write_psi_M1(const VectorXcd& phi, std::vector<double>& psi);
+        void write_psi_M1(const VectorXcd& phi, std::vector<double>& psi); // Change
         
 
-        void write_psi_M2(const long long patch_num, const std::complex<double>* phi, std::vector<double>& psi);
+        void write_psi_M2(const long long patch_num, const std::complex<double>* phi, std::vector<double>& psi); // delete
        
 
         void compute_integral_overs_M1(const VectorXcd& phi,
                                        const std::vector<double>& psi_overs,
-                                       VectorXcd& integral);
+                                       VectorXcd& integral); // change
        
         void compute_integral_overs_M2(const VectorXcd& phi,
-                                       VectorXcd& integral);
+                                       VectorXcd& integral); // delete
         
         void compute_integral_overs_acc_M1(const VectorXcd& phi,
                                            const std::vector<double>& psi_overs,
-                                           VectorXcd& integral);
+                                           VectorXcd& integral); // change
         
         void compute_integral_overs_acc_M2(const VectorXcd& phi,
-                                           VectorXcd& integral);
+                                           VectorXcd& integral); // delete
        
         void iterator_function_overs(const VectorXcd& phi,
-                                     VectorXcd& rhs);
+                                     VectorXcd& rhs); // change
 
         void iterator_function_overs_acc(const VectorXcd& phi,
-                                         VectorXcd& rhs);
+                                         VectorXcd& rhs); // change
 
         void iterator_function(const VectorXcd& phi,
-                               VectorXcd& rhs);
+                               VectorXcd& rhs); // change
         
-        void setup(bool timing); 
+        void setup(bool timing); // merge
        
-        VectorXcd solve(const VectorXcd& rhs); 
+        VectorXcd solve(const VectorXcd& rhs); // change
         
 
-        VectorXcd compute_incident_field();
+        VectorXcd compute_incident_field(); // change
 
-        VectorXcd solve_u_inc(bool timing);
+        VectorXcd solve_u_inc(bool timing); // change
 
         void int_far_field(const double xVers_0, const double xVers_1, const double xVers_2,
                            const long long npatch, 
                            const std::complex<double>* phi,
-                           std::complex<double>& solution);    
+                           std::complex<double>& solution); // Change  
 
         std::complex<double> compute_far_field_approx(const VectorXcd& phi, 
-                                                      const double xVers_0, const double xVers_1, const double xVers_2); 
+                                                      const double xVers_0, const double xVers_1, const double xVers_2); // Change
        
 
         std::complex<double> compute_far_field_exact(const double xVers_0, const double xVers_1, const double xVers_2); 
         
-        void compute_far_field_error(const bool timing, const VectorXcd& phi);
+        void compute_far_field_error(const bool timing, const VectorXcd& phi); // change
         
         //std::complex<double> compute_incident_field(double x, double y, double z) 
         
@@ -439,22 +438,22 @@ class Solver
         void int_near_field(const double x_0, const double x_1, const double x_2,
                             const long long npatch, 
                             const std::complex<double>* phi,
-                            std::complex<double>& solution);                     
+                            std::complex<double>& solution); // change                     
        
 
         std::complex<double> compute_near_field_approx(const VectorXcd& phi, 
-                                                       const double x_0, const double x_1, const double x_2); 
+                                                       const double x_0, const double x_1, const double x_2); // change
         
         /*
         Custom function to evaluate the near field, based off of a small change from compute
         near_field_approx
         */
         std::complex<double> compute_near_field(const VectorXcd& phi, 
-                                                       const double x_0, const double x_1, const double x_2); 
+                                                       const double x_0, const double x_1, const double x_2); // merge
        
         // void compute_near_field_error(const bool timing, const VectorXcd& phi)
        
-        std::complex<double> iterator_function_Manuel(const VectorXcd& u, const VectorXcd& v);
+        std::complex<double> iterator_function_Manuel(const VectorXcd& u, const VectorXcd& v); // change / delete 
        
 
         ////////////////////// Getters/ Setters //////////////////////////////////////////
@@ -476,12 +475,6 @@ class Solver
         void set_int_ext(int int_ext) {INT_EXT = int_ext;}
         void set_coup_param(std::complex<double> cp) {coupling_parameter_ = cp; init_compute_coupling_param_ = false;}
         void set_num_wl_per_patch(double num_wl) {num_wl_per_patch = num_wl;}
-
-        void set_jac_to_one() {
-            for (long long i = 0; i < Q_ * Qx_ * Qy_ * Nu_int_ * Nv_int_; i++) {
-                dsdtjac_all_[i] = 1.0;
-            }
-        }
         //////////////////////////////////////////////////////////////////////////////////
 
         // basic code to initialize the solver, after calling the constructor, which

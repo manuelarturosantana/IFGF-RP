@@ -8,7 +8,6 @@
 #include <fstream>
 #include <algorithm>
 
-#include "edge_cv.h"
 #include "rp_cv.h"
 #include "parametrization.h"
 
@@ -218,6 +217,17 @@ class Solver
         // Adaptivity parameters:
         bool USE_ADAPTIVITY = false;
         long long MAX_ELEMS_LEAF = 100;
+
+        int N_FAR_PTS[2] = {200, 200};
+        std::vector<std::vector<int>> N_NEAR_PTS = {{10, 10, 1},
+                                                  {10, 1, 10}};
+        std::vector<std::vector<double>> NEAR_FIELD_LIMITS = {{-12.0, 12.0, -12.0, 12.0, -25.0, -25.0},
+                                                            {-12.0, 12.0, 0.0, 0.0, -25.0, 15.0}};
+
+        const double BBSIZEOFFSET = 0.0;
+
+        // OpenMP parameters:
+        const int NTHREADS = 16;
 
         ///////////////////////////////// Methods ////////////////////////////////////////
 
