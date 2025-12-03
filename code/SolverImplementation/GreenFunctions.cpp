@@ -1,12 +1,9 @@
 #pragma once
 
-#include "edge_cv.h"
-#include "rp_cv.h"
-#include <complex>
+#include "../solver2.h"
 
-#include <cmath>
 
-inline void HH(
+void Solver::HH(
     const double p1x, const double p1y, const double p1z,
     const double p2x, const double p2y, const double p2z,
     const double nx, const double ny, const double nz,
@@ -15,7 +12,7 @@ inline void HH(
     const double dxdsdsx, const double dxdsdsy, const double dxdsdsz,
     const double dxdsdtx, const double dxdsdty, const double dxdsdtz,
     const double dxdtdtx, const double dxdtdty, const double dxdtdtz,
-    const double coupling_parameter, double WAVE_NUMBER, int EQUATION_FORMULATION,
+    const double coupling_parameter, double wavenumber,
     std::complex<double>& solution)
 {
     
@@ -38,8 +35,8 @@ inline void HH(
         const double inv_norm_diff = 1.0 / norm_diff;
         const double inv_norm_diff_sq = inv_norm_diff * inv_norm_diff;
 
-        const double val_cos = std::cos(WAVE_NUMBER * norm_diff);
-        const double val_sin = std::sin(WAVE_NUMBER * norm_diff);
+        const double val_cos = std::cos(wavenumber * norm_diff);
+        const double val_sin = std::sin(wavenumber * norm_diff);
 
         double solution_real, solution_imag;
         
@@ -70,12 +67,12 @@ inline void HH(
                 }
                 
                 const double term1 = val_cos * inv_norm_diff;
-                const double term2 = WAVE_NUMBER * val_sin;
+                const double term2 = wavenumber * val_sin;
                 
                 solution_real = -INV_4_PI * beta * (term1 + term2);
 
                 const double term3 = val_sin * inv_norm_diff;
-                const double term4 = WAVE_NUMBER * val_cos;
+                const double term4 = wavenumber * val_cos;
                 
                 solution_imag = -INV_4_PI * beta * (term3 - term4);
                 break;
@@ -100,11 +97,11 @@ inline void HH(
                 }
 
                 const double term1 = val_cos * inv_norm_diff;
-                const double term2 = WAVE_NUMBER * val_sin;
+                const double term2 = wavenumber * val_sin;
                 const double solution_real_D = -INV_4_PI * beta * (term1 + term2);
 
                 const double term3 = val_sin * inv_norm_diff;
-                const double term4 = WAVE_NUMBER * val_cos;
+                const double term4 = wavenumber * val_cos;
                 const double solution_imag_D = -INV_4_PI * beta * (term3 - term4);
 
                 solution_real = solution_real_D + coupling_parameter * solution_imag_S;
@@ -130,10 +127,10 @@ inline void HH(
 
 }
 
-inline void HH2(const double p1x, const double p1y, const double p1z,
+void Solver::HH2(const double p1x, const double p1y, const double p1z,
          const double p2x, const double p2y, const double p2z,
          const double nx, const double ny, const double nz,
-         double coupling_parameter, double WAVE_NUMBER, int EQUATION_FORMULATION,
+         double coupling_parameter, double wavenumber,
          std::complex<double>& solution)
 {
 
@@ -148,8 +145,8 @@ inline void HH2(const double p1x, const double p1y, const double p1z,
 
     } else {   
 
-        const double val_cos = std::cos(WAVE_NUMBER * norm_diff);
-        const double val_sin = std::sin(WAVE_NUMBER * norm_diff);
+        const double val_cos = std::cos(wavenumber * norm_diff);
+        const double val_sin = std::sin(wavenumber * norm_diff);
 
         if (EQUATION_FORMULATION == 1) {
 
@@ -163,8 +160,8 @@ inline void HH2(const double p1x, const double p1y, const double p1z,
             const double rDotNorm = (p2x - p1x) * nx + (p2y - p1y) * ny + (p2z - p1z) * nz;
             double beta = rDotNorm / (norm_diff * norm_diff);
 
-            solution_real = -(1.0 / (4.0 * M_PI)) * beta * (val_cos / norm_diff + WAVE_NUMBER * val_sin);
-            solution_imag = -(1.0 / (4.0 * M_PI)) * beta * (val_sin / norm_diff - WAVE_NUMBER * val_cos);        
+            solution_real = -(1.0 / (4.0 * M_PI)) * beta * (val_cos / norm_diff + wavenumber * val_sin);
+            solution_imag = -(1.0 / (4.0 * M_PI)) * beta * (val_sin / norm_diff - wavenumber * val_cos);        
 
             if (USE_ACCELERATOR) {
 
@@ -185,8 +182,8 @@ inline void HH2(const double p1x, const double p1y, const double p1z,
             const double rDotNorm = (p2x - p1x) * nx + (p2y - p1y) * ny + (p2z - p1z) * nz;
             double beta = rDotNorm / (norm_diff * norm_diff);
 
-            double solution_real_D = -(1.0 / (4.0 * M_PI)) * beta * (val_cos / norm_diff + WAVE_NUMBER * val_sin);
-            double solution_imag_D = -(1.0 / (4.0 * M_PI)) * beta * (val_sin / norm_diff - WAVE_NUMBER * val_cos);        
+            double solution_real_D = -(1.0 / (4.0 * M_PI)) * beta * (val_cos / norm_diff + wavenumber * val_sin);
+            double solution_imag_D = -(1.0 / (4.0 * M_PI)) * beta * (val_sin / norm_diff - wavenumber * val_cos);        
 
             if (USE_ACCELERATOR) {
 
@@ -206,17 +203,17 @@ inline void HH2(const double p1x, const double p1y, const double p1z,
 
 }
 
-inline void HH_far(const double xVers_0, const double xVers_1, const double xVers_2,
+void Solver::HH_far(const double xVers_0, const double xVers_1, const double xVers_2,
             const double y_0, const double y_1, const double y_2,
             const double n_0, const double n_1, const double n_2,
-            const double coupling_parameter, double WAVE_NUMBER, int EQUATION_FORMULATION,
+            const double coupling_parameter, double wavenumber,
             std::complex<double>& solution)
 {
 
     double solution_real, solution_imag;
 
-    const double inner_prod = - WAVE_NUMBER * (xVers_0 * y_0 + xVers_1 * y_1 + xVers_2 * y_2);
-    const double inner_prod_2 = - WAVE_NUMBER * (xVers_0 * n_0 + xVers_1 * n_1 + xVers_2 * n_2);
+    const double inner_prod = - wavenumber * (xVers_0 * y_0 + xVers_1 * y_1 + xVers_2 * y_2);
+    const double inner_prod_2 = - wavenumber * (xVers_0 * n_0 + xVers_1 * n_1 + xVers_2 * n_2);
 
     const double S_real = std::cos(inner_prod);
     const double S_imag = std::sin(inner_prod);
@@ -245,3 +242,40 @@ inline void HH_far(const double xVers_0, const double xVers_1, const double xVer
     solution = std::complex<double>{solution_real, solution_imag};
 
 }
+
+void Solver::fct_4(const double x1, const double x2, const double x3,
+                                 const double y1, const double y2, const double y3,
+                                 const double normal1, const double normal2, const double normal3,
+                                 const double coupling_parameter, const double wavenumber,
+                                 const std::complex<double> density, 
+                                 std::complex<double>& phi)
+{
+
+    std::complex<double> kernel;
+
+    HH2(x1, x2, x3, 
+        y1, y2, y3,
+        normal1, normal2, normal3,
+        coupling_parameter, wavenumber,
+        kernel);
+
+    const double kerreal = kernel.real();
+    const double kerimag = kernel.imag();
+
+    const double phireal = density.real() * kerreal - density.imag() * kerimag;
+    const double phiimag = density.real() * kerimag + density.imag() * kerreal;
+
+    phi = {phireal, phiimag};
+
+}
+
+void Solver::fac_1(const double distance, double wavenumber, std::complex<double>& sol) 
+{
+
+    const double re = std::cos(wavenumber * distance) / distance;
+    const double im = std::sin(wavenumber * distance) / distance;
+
+    sol = {re, im};
+
+}
+

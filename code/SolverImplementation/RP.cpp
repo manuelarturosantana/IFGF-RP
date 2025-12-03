@@ -81,7 +81,7 @@ void Solver::beta(const double r_0, const double r_1, const double r_2,
                 dxdsdsx, dxdsdsy, dxdsdsz,
                 dxdsdtx, dxdsdty, dxdsdtz,
                 dxdtdtx, dxdtdty, dxdtdtz,
-                coupling_parameter_, WAVE_NUMBER, EQUATION_FORMULATION,
+                coupling_parameter_, WAVE_NUMBER,
                 H[i*Nv_prec_+j]);
 
                 
@@ -138,7 +138,7 @@ void Solver::beta(const double r_0, const double r_1, const double r_2,
                 0.0, 0.0, 0.0,
                 0.0, 0.0, 0.0,
                 0.0, 0.0, 0.0,
-                coupling_parameter_,  WAVE_NUMBER, EQUATION_FORMULATION,
+                coupling_parameter_,  WAVE_NUMBER,
                 H[i*Nv_prec_+j]);
                 
                 H[i*Nv_prec_+j] *= muwi[i]*muwj[j];
@@ -645,7 +645,7 @@ void Solver::int_far(const double r_0, const double r_1, const double r_2,
 
         // Compute kernel
         std::complex<double> kernel(0.0, 0.0);
-        HH2(r_0, r_1, r_2, px, py, pz, nx, ny, nz, coupling_parameter_, WAVE_NUMBER, EQUATION_FORMULATION, kernel);
+        HH2(r_0, r_1, r_2, px, py, pz, nx, ny, nz, coupling_parameter_, WAVE_NUMBER, kernel);
 
         // Accumulate real and imaginary parts separately
         const std::complex<double> term = constant * kernel * phi[i];

@@ -10,7 +10,9 @@ void Solver::create_IFGF_object()
                             norm_points_y_all_.begin(), norm_points_y_all_.end(),
                             norm_points_z_all_.begin(), norm_points_z_all_.end(),
                             split_points_2_, recv_counts_2_, displs_2_,
-                            coupling_parameter_, WAVE_NUMBER, EQUATION_FORMULATION,
+                            coupling_parameter_, WAVE_NUMBER,
+                            Nu_int_, Nv_int_, 
+                            USE_ADAPTIVITY, USE_ACCELERATOR, MAX_ELEMS_LEAF, N_LEVELS_IFGF,
                             new_order_points_IFGF_, mpi_comm_);
 }
 

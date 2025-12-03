@@ -11,7 +11,6 @@
 #include "edge_cv.h"
 #include "rp_cv.h"
 #include "parametrization.h"
-#include "GreenFunctions.hpp"
 
 #include "BoxTree.h"
 
@@ -25,9 +24,6 @@
 #include <petscmat.h>
 #include <petscvec.h>
 #include <petscksp.h>
-
-
-
 
 
 struct InterpPatch {
@@ -133,6 +129,8 @@ class Solver
         
         std::unordered_map<long long, std::vector<double>> dsdtjac_not_in_rank_;
 
+  
+
     public:
         //////////////////////////////////// Parameters //////////////////////////////////
         int G_SEARCH_MAX_ITER = 50;
@@ -140,25 +138,29 @@ class Solver
 
 
         // Choose integral equation formulation:
-
+        // Default 3 in the constructor
         // Single Layer = 1
         // Double Layer = 2
         // Combined Layer = 3 
         // 4
-        int EQUATION_FORMULATION = 3;
+        // Note this is static because it is used in HH, HH2, and we need fct4 to be static
+        // so it can be passed in by template, which is a performance issue.
+        static inline int EQUATION_FORMULATION = 3;
+
+
 
         // Discretization parameters:
 
         // Number of points used per dimension per patch in every patch
-        // TODO: MOVED CONSTEXPR FROM HERE
-        // long long N_PTS_PER_PATCH[2] = {6, 6};
-        // // Number of patch partitions along first and second dimensions
-        // long long N_SPLIT_PER_PATCH[2] = {16, 16};
+        long long N_PTS_PER_PATCH[2] = {6, 6};
+        // Number of patch partitions along first and second dimensions
+        long long N_SPLIT_PER_PATCH[2] = {16, 16};
         
         // // Singular integration parameters:
 
         // // Number of points used with the singular integration
-        // int N_PTS_SING_INT[2] = {40, 40};
+        int N_PTS_SING_INT[2] = {40, 40};
+
         // Proximity distance that determines near singular integrals
         int DELTA_METHOD = 1;
         double PROXIMITY_BOX_SIZE = 0.1/16;
@@ -197,10 +199,9 @@ class Solver
         // kx = k*cos(the)*sin(phi)
         // ky = k*sin(the)*sin(phi)
         // kz = k*cos(phi)
-
-        // TODO: Move lambda out
-        double LAMBDA = 2.0 * SPHERE_RADIUS / 8.0; // 2.0 * M_PI / WAVE_NUMBER
-        double WAVE_NUMBER = 2.0 * M_PI / LAMBDA;
+       
+        // std::complex<double> WAVE_NUMBER = std::complex<double>(M_PI, 0);
+        double WAVE_NUMBER = M_PI;
         double PLANE_WAVE_THE = 0.0; // in [0, 2pi)
         double PLANE_WAVE_PHI = M_PI; // in [0, pi]
 
@@ -209,6 +210,14 @@ class Solver
         std::vector<std::vector<double>> POINT_SOURCE_CENTER = {{0.0, 0.0, 3.3},
                                                                     {0.0, 3.3, 0.0}};
 
+
+        // IFGF Parameters
+        static inline bool USE_ACCELERATOR = true;
+        int N_LEVELS_IFGF = 5; // Does not need to be set if USE_ADAPTIVITY is true
+
+        // Adaptivity parameters:
+        bool USE_ADAPTIVITY = false;
+        long long MAX_ELEMS_LEAF = 100;
 
         ///////////////////////////////// Methods ////////////////////////////////////////
 
@@ -260,44 +269,41 @@ class Solver
         void compute_new_order_points_RP(); // IFGF.cpp 
 
         void check_patch_in_neighbours(); // IFGF.cpp
+
+        void static HH(
+            const double p1x, const double p1y, const double p1z,
+            const double p2x, const double p2y, const double p2z,
+            const double nx, const double ny, const double nz,
+            const double dxdsx, const double dxdsy, const double dxdsz,
+            const double dxdtx, const double dxdty, const double dxdtz,
+            const double dxdsdsx, const double dxdsdsy, const double dxdsdsz,
+            const double dxdsdtx, const double dxdsdty, const double dxdsdtz,
+            const double dxdtdtx, const double dxdtdty, const double dxdtdtz,
+            const double coupling_parameter, double wavenumber,
+            std::complex<double>& solution);  // GreenFunctions.cpp
+
+        void static HH2(const double p1x, const double p1y, const double p1z,
+         const double p2x, const double p2y, const double p2z,
+         const double nx, const double ny, const double nz,
+         double coupling_parameter, double wavenumber,
+         std::complex<double>& solution);  // GreenFunctions.cpp
+
+        void static HH_far(const double xVers_0, const double xVers_1, const double xVers_2,
+            const double y_0, const double y_1, const double y_2,
+            const double n_0, const double n_1, const double n_2,
+            const double coupling_parameter, double wavenumber,
+            std::complex<double>& solution);  // GreenFunctions.cpp
         
 
-        inline void static fct_4(const double x1, const double x2, const double x3,
+        void static fct_4(const double x1, const double x2, const double x3,
                                  const double y1, const double y2, const double y3,
                                  const double normal1, const double normal2, const double normal3,
-                                 const double coupling_parameter, const double wavenumber, const int equation_formulation,
+                                 const double coupling_parameter, const double wavenumber,
                                  const std::complex<double> density, 
-                                 std::complex<double>& phi) 
-        {
+                                 std::complex<double>& phi);  // GreenFunctions.cpp
+     
+        void static fac_1(const double distance, double wavenumber, std::complex<double>& sol); // GreenFunctions.cpp
 
-            std::complex<double> kernel;
-
-            HH2(x1, x2, x3, 
-                y1, y2, y3,
-                normal1, normal2, normal3,
-                coupling_parameter, wavenumber, equation_formulation,
-                kernel);
-
-            const double kerreal = kernel.real();
-            const double kerimag = kernel.imag();
-
-            const double phireal = density.real() * kerreal - density.imag() * kerimag;
-            const double phiimag = density.real() * kerimag + density.imag() * kerreal;
-
-            phi = {phireal, phiimag};
-
-        }
-
-        // TODO: 
-        inline void static fac_1(const double distance, double wavenumber, std::complex<double>& sol)
-        {
-
-            const double re = std::cos(wavenumber * distance) / distance;
-            const double im = std::sin(wavenumber * distance) / distance;
-
-            sol = {re, im};
-
-        }
 
         void compute_intensities_patch(const long long npatch,
                                        const std::complex<double>* phi, 

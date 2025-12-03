@@ -67,7 +67,6 @@ class BoxTree
         // These parameters need to be passed in from Solver
         int nlevels_;
         double wavenumber_; 
-        int equation_formulation_; 
         bool USE_ADAPTIVITY;
         bool USE_ACCELERATOR;
         long long MAX_ELEMS_LEAF;
@@ -2198,7 +2197,7 @@ class BoxTree
         }
 
         template <void _kernel(const double, const double, const double, const double, const double, const double, const double, const double, const double,
-                               const double, const double, const int, const std::complex<double>, 
+                               const double, const double, const std::complex<double>, 
                                std::complex<double>&)>
         void SingularInteractions(const std::vector<std::complex<double>>& density,
                                   const std::unordered_map<long long, std::complex<double>>& density_not_in_rank,
@@ -2279,7 +2278,7 @@ class BoxTree
                         _kernel(loc_data[0], loc_data[1], loc_data[2], 
                                 xp, yp, zp, 
                                 loc_data[3], loc_data[4], loc_data[5], 
-                                coupling_parameter_, wavenumber_, equation_formulation_,
+                                coupling_parameter_, wavenumber_,
                                 src_dens, k_val);
 
                         solution_[i] += k_val;
@@ -2310,7 +2309,7 @@ class BoxTree
                         _kernel(sx, sy, sz,
                                 xp, yp, zp, 
                                 nx, ny, nz,
-                                coupling_parameter_, wavenumber_, equation_formulation_,
+                                coupling_parameter_, wavenumber_,
                                 src_dens, k_val);
 
                         solution_[i] += k_val;                        
@@ -2339,7 +2338,7 @@ class BoxTree
                         _kernel(loc_data[0], loc_data[1], loc_data[2], 
                                 xp, yp, zp, 
                                 loc_data[3], loc_data[4], loc_data[5], 
-                                coupling_parameter_, wavenumber_, equation_formulation_,
+                                coupling_parameter_, wavenumber_,
                                 src_dens, k_val);
 
                         solution_[i] += k_val;
@@ -2355,7 +2354,7 @@ class BoxTree
         }
 
         template <void _kernel(const double, const double, const double, const double, const double, const double, const double, const double, const double,
-                               const double, const double, const int, const std::complex<double>, std::complex<double>&),
+                               const double, const double, const std::complex<double>, std::complex<double>&),
                   void _factorization(const double, const double, std::complex<double>&)>
         void LevelDEvaluations(const std::vector<std::complex<double>>& density,
                                const std::unordered_map<long long, std::complex<double>>& density_not_in_rank,
@@ -2445,7 +2444,7 @@ class BoxTree
                         _kernel(loc_data[0], loc_data[1], loc_data[2], 
                                 t_x[j], t_y[j], t_z[j], 
                                 loc_data[3], loc_data[4], loc_data[5], 
-                                coupling_parameter_, wavenumber_, equation_formulation_,
+                                coupling_parameter_, wavenumber_,
                                 src_dens, k_val);
 
                         t_results[j] += k_val;
@@ -2470,7 +2469,7 @@ class BoxTree
                         _kernel(sx, sy, sz, 
                                 t_x[j], t_y[j], t_z[j], 
                                 nx, ny, nz, 
-                                coupling_parameter_, wavenumber_, equation_formulation_,
+                                coupling_parameter_, wavenumber_, 
                                  src_dens, k_val);
 
                         t_results[j] += k_val;
@@ -2493,7 +2492,7 @@ class BoxTree
                         _kernel(loc_data[0], loc_data[1], loc_data[2], 
                                 t_x[j], t_y[j], t_z[j], 
                                 loc_data[3], loc_data[4], loc_data[5], 
-                                coupling_parameter_, wavenumber_, equation_formulation_,
+                                coupling_parameter_, wavenumber_,
                                 src_dens, k_val);
 
                         t_results[j] += k_val;
@@ -2595,7 +2594,7 @@ class BoxTree
         }
 
         template<void _kernel(const double, const double, const double, const double, const double, const double, const double, const double, const double,
-                              const double, const double, const int, const std::complex<double>, std::complex<double>&),
+                              const double, const double, const std::complex<double>, std::complex<double>&),
                  void _factorization(const double, const double, std::complex<double>&)>
         void Interpolation(const int level, const std::unordered_map<long long, std::vector<std::complex<double>>>& coeffs,
                            const std::vector<std::complex<double>>& density, const std::unordered_map<long long, std::complex<double>>& density_not_in_rank,
@@ -2683,7 +2682,7 @@ class BoxTree
                             _kernel(loc_data[0], loc_data[1], loc_data[2], 
                                     xp, yp, zp, 
                                     loc_data[3], loc_data[4], loc_data[5], 
-                                    coupling_parameter_, wavenumber_, equation_formulation_,
+                                    coupling_parameter_, wavenumber_,
                                     src_dens, k_val);
     
                             solution_[i] += k_val;
@@ -2714,7 +2713,7 @@ class BoxTree
                             _kernel(sx, sy, sz,
                                     xp, yp, zp, 
                                     nx, ny, nz,
-                                    coupling_parameter_, wavenumber_, equation_formulation_,
+                                    coupling_parameter_, wavenumber_,
                                      src_dens, k_val);
 
                             solution_[i] += k_val;   
@@ -2743,7 +2742,7 @@ class BoxTree
                             _kernel(loc_data[0], loc_data[1], loc_data[2], 
                                     xp, yp, zp, 
                                     loc_data[3], loc_data[4], loc_data[5], 
-                                    coupling_parameter_, wavenumber_, equation_formulation_,
+                                    coupling_parameter_, wavenumber_,
                                     src_dens, k_val);
 
                             solution_[i] += k_val;
@@ -2882,7 +2881,7 @@ class BoxTree
         }
 
         template<void _kernel(const double, const double, const double, const double, const double, const double, const double, const double, const double,
-                              const double, const double, const int, const std::complex<double>, std::complex<double>&),
+                              const double, const double, const std::complex<double>, std::complex<double>&),
                  void _factorization(const double, const double, std::complex<double>&)>
         void Propagation(const int level, const std::unordered_map<long long, std::vector<std::complex<double>>>& coeffs,
                             const std::vector<std::complex<double>>& density, const std::unordered_map<long long, std::complex<double>>& density_not_in_rank,
@@ -2968,7 +2967,7 @@ class BoxTree
                                 _kernel(loc_data[0], loc_data[1], loc_data[2], 
                                         x[j], y[j], z[j], 
                                         loc_data[3], loc_data[4], loc_data[5], 
-                                        coupling_parameter_, wavenumber_, equation_formulation_,
+                                        coupling_parameter_, wavenumber_,
                                         src_density, k_val);
 
                                 value[j] += k_val;
@@ -2993,7 +2992,7 @@ class BoxTree
                                 _kernel(sx, sy, sz, 
                                         x[j], y[j], z[j], 
                                         nx, ny, nz, 
-                                        coupling_parameter_, wavenumber_, equation_formulation_,
+                                        coupling_parameter_, wavenumber_,
                                         s_dens, k_val);
 
                                 value[j] += k_val;
@@ -3016,7 +3015,7 @@ class BoxTree
                                 _kernel(loc_data[0], loc_data[1], loc_data[2], 
                                         x[j], y[j], z[j], 
                                         loc_data[3], loc_data[4], loc_data[5], 
-                                        coupling_parameter_, wavenumber_, equation_formulation_,
+                                        coupling_parameter_, wavenumber_,
                                         src_density, k_val);
 
                                 value[j] += k_val;
@@ -3115,7 +3114,7 @@ class BoxTree
                               const std::vector<long long>& split_points,
                               const std::vector<MPI_Count>& recv_counts,
                               const std::vector<MPI_Aint>& displs,
-                              double coupling_parameter, double WAVE_NUMBER, int EQUATION_FORMULATION,
+                              double coupling_parameter, double WAVE_NUMBER,
                               int Nu_int, int Nv_int, 
                               bool use_adaptivity, bool use_acc, long long max_elems_per_leaf, int n_levels_ifgf, 
                               std::vector<long long>& sorting, MPI_Comm mpi_comm)
@@ -3131,7 +3130,7 @@ class BoxTree
 
             nlevels_ = n_levels_ifgf;
             wavenumber_ = WAVE_NUMBER;
-            equation_formulation_ = EQUATION_FORMULATION;
+
             mpi_comm_ = mpi_comm;
             N_PTS_PER_PATCH[0] = Nu_int;
             N_PTS_PER_PATCH[1] = Nv_int;
@@ -3253,7 +3252,7 @@ class BoxTree
         }
 
         template <void _kernel(const double, const double, const double, const double, const double, const double, const double, const double, const double,
-        const double, const double, const int, const std::complex<double>, std::complex<double>&),
+        const double, const double, const std::complex<double>, std::complex<double>&),
         void _factorization(const double, const double, std::complex<double>&)>
         void Solve(std::vector<std::complex<double>>& density,
                    const std::vector<double>& x,
@@ -3266,7 +3265,7 @@ class BoxTree
         }
 
         template <void _kernel(const double, const double, const double, const double, const double, const double, const double, const double, const double,
-        const double, const double, const int, const std::complex<double>, std::complex<double>&),
+        const double, const double, const std::complex<double>, std::complex<double>&),
         void _factorization(const double, const double, std::complex<double>&)>
         void Solve(std::vector<std::complex<double>>& density) {
 
@@ -3275,7 +3274,7 @@ class BoxTree
         }
 
         template <void _kernel(const double, const double, const double, const double, const double, const double, const double, const double, const double,
-        const double, const double, const int, const std::complex<double>, std::complex<double>&),
+        const double, const double, const std::complex<double>, std::complex<double>&),
         void _factorization(const double, const double, std::complex<double>&)>
         void SolveOrig(std::vector<std::complex<double>>& density,
                        const std::vector<double>& x,

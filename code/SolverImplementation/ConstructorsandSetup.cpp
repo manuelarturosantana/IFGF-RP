@@ -528,7 +528,7 @@ void Solver::compute_coupling_parameter()
     MPI_Allreduce(&loc_min_z, &global_min_z, 1, MPI_DOUBLE, MPI_MIN, MPI_COMM_WORLD);
 
     const double scatDiam = std::max({global_max_x - global_min_x, global_max_y - global_min_y, global_max_z - global_min_z});
-    
+    double LAMBDA = 2 * M_PI / std::real(WAVE_NUMBER);
     coupling_parameter_ = std::max(3.0, scatDiam / LAMBDA);
 
 }
@@ -1543,7 +1543,9 @@ Solver::Solver( const std::string directory,
                
 }
 
-void Solver::init_solver(const bool timing, const double k, MPI_Comm mpi_comm) {
+void Solver::init_solver(const bool timing, const double k, MPI_Comm mpi_comm)  {
+
+
 
     WAVE_NUMBER = k;
     mpi_comm_   = mpi_comm;
