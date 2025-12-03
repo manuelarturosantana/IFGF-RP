@@ -11,14 +11,14 @@ void Solver::create_IFGF_object()
                             norm_points_z_all_.begin(), norm_points_z_all_.end(),
                             split_points_2_, recv_counts_2_, displs_2_,
                             coupling_parameter_, WAVE_NUMBER, EQUATION_FORMULATION,
-                            new_order_points_IFGF_);
+                            new_order_points_IFGF_, mpi_comm_);
 }
 
 void Solver::set_precomputations_data_IFGF()
 {
 
     std::unordered_map<long long, std::unordered_set<long long>> patch_to_sing_point;
-    std::vector<std::vector<long long>> points_not_in_rank(world_size_);
+    std::vector<std::vector<long long>> points_not_in_rank(comm_size_);
 
     for (long long i = 0; i < point_up_ - point_low_; i++) {
 
@@ -32,13 +32,13 @@ void Solver::set_precomputations_data_IFGF()
         
             rank = 0;
         
-        } else if (rank >= world_size_) {
+        } else if (rank >= comm_size_) {
         
-            rank = world_size_ - 1; 
+            rank = comm_size_ - 1; 
         
         }
 
-        if (world_rank_ == rank) {
+        if (comm_rank_ == rank) {
 
             const auto point_begin = std::lower_bound(point_precomputations_.begin(), point_precomputations_.end(), point);
             const auto point_end = std::upper_bound(point_precomputations_.begin(), point_precomputations_.end(), point);
@@ -60,11 +60,11 @@ void Solver::set_precomputations_data_IFGF()
 
     }
 
-    std::vector<MPI_Count> send_counts_points(world_size_);
-    std::vector<MPI_Aint> sdispls_points(world_size_);
+    std::vector<MPI_Count> send_counts_points(comm_size_);
+    std::vector<MPI_Aint> sdispls_points(comm_size_);
     MPI_Count total_send_points = 0;    
 
-    for (int i = 0; i < world_size_; ++i) {
+    for (int i = 0; i < comm_size_; ++i) {
 
         send_counts_points[i] = static_cast<MPI_Count>(points_not_in_rank[i].size());
         sdispls_points[i] = total_send_points;
@@ -76,7 +76,7 @@ void Solver::set_precomputations_data_IFGF()
     
     MPI_Aint current_point_pos = 0;
 
-    for (int i = 0; i < world_size_; ++i) {
+    for (int i = 0; i < comm_size_; ++i) {
 
         std::copy(points_not_in_rank[i].begin(), points_not_in_rank[i].end(),
                     flat_send_points_buffer.begin() + current_point_pos);
@@ -86,14 +86,14 @@ void Solver::set_precomputations_data_IFGF()
 
     points_not_in_rank.clear();
 
-    std::vector<MPI_Count> recv_counts_points(world_size_);
+    std::vector<MPI_Count> recv_counts_points(comm_size_);
 
-    MPI_Alltoall(send_counts_points.data(), 1, MPI_COUNT, recv_counts_points.data(), 1, MPI_COUNT, MPI_COMM_WORLD);
+    MPI_Alltoall(send_counts_points.data(), 1, MPI_COUNT, recv_counts_points.data(), 1, MPI_COUNT, mpi_comm_);
 
-    std::vector<MPI_Aint> rdispls_points(world_size_);
+    std::vector<MPI_Aint> rdispls_points(comm_size_);
     MPI_Count total_recv_points = 0;
 
-    for (int i = 0; i < world_size_; ++i) {
+    for (int i = 0; i < comm_size_; ++i) {
 
         rdispls_points[i] = total_recv_points;
         total_recv_points += recv_counts_points[i];
@@ -104,14 +104,14 @@ void Solver::set_precomputations_data_IFGF()
     
     MPI_Alltoallv_c(flat_send_points_buffer.data(), send_counts_points.data(), sdispls_points.data(), MPI_LONG_LONG,
                     flat_recv_points_buffer.data(), recv_counts_points.data(), rdispls_points.data(), MPI_LONG_LONG,
-                    MPI_COMM_WORLD);
+                    mpi_comm_);
 
-    std::vector<std::vector<MPI_Count>> patch_counts_to_send_back(world_size_);
-    std::vector<std::vector<long long>> patches_data_to_send_back(world_size_);
+    std::vector<std::vector<MPI_Count>> patch_counts_to_send_back(comm_size_);
+    std::vector<std::vector<long long>> patches_data_to_send_back(comm_size_);
 
     MPI_Aint current_flat_recv_points_idx = 0;
 
-    for (int sender_rank = 0; sender_rank < world_size_; ++sender_rank) {
+    for (int sender_rank = 0; sender_rank < comm_size_; ++sender_rank) {
 
         MPI_Count num_points_from_this_sender = recv_counts_points[sender_rank];
 
@@ -143,11 +143,11 @@ void Solver::set_precomputations_data_IFGF()
 
     flat_recv_points_buffer.clear();
 
-    std::vector<MPI_Count> send_counts_patch_counts(world_size_);
-    std::vector<MPI_Aint> sdispls_patch_counts(world_size_);
+    std::vector<MPI_Count> send_counts_patch_counts(comm_size_);
+    std::vector<MPI_Aint> sdispls_patch_counts(comm_size_);
     MPI_Count total_send_patch_counts_flat = 0;
 
-    for (int i = 0; i < world_size_; ++i) {
+    for (int i = 0; i < comm_size_; ++i) {
 
         send_counts_patch_counts[i] = static_cast<MPI_Count>(patch_counts_to_send_back[i].size());
         sdispls_patch_counts[i] = total_send_patch_counts_flat;
@@ -159,7 +159,7 @@ void Solver::set_precomputations_data_IFGF()
 
     MPI_Count current_flat_send_pos = 0;
 
-    for (int i = 0; i < world_size_; ++i) {
+    for (int i = 0; i < comm_size_; ++i) {
 
         std::copy(patch_counts_to_send_back[i].begin(), patch_counts_to_send_back[i].end(),
                 flat_send_patch_counts_buffer.begin() + current_flat_send_pos);
@@ -169,15 +169,15 @@ void Solver::set_precomputations_data_IFGF()
 
     patch_counts_to_send_back.clear();
 
-    std::vector<MPI_Count> recv_counts_patch_counts(world_size_);
+    std::vector<MPI_Count> recv_counts_patch_counts(comm_size_);
 
     MPI_Alltoall(send_counts_patch_counts.data(), 1, MPI_COUNT,
-                    recv_counts_patch_counts.data(), 1, MPI_COUNT, MPI_COMM_WORLD);
+                    recv_counts_patch_counts.data(), 1, MPI_COUNT, mpi_comm_);
 
     MPI_Count total_recv_patch_counts_flat = 0;
-    std::vector<MPI_Aint> rdispls_patch_counts(world_size_);
+    std::vector<MPI_Aint> rdispls_patch_counts(comm_size_);
 
-    for (int i = 0; i < world_size_; ++i) {
+    for (int i = 0; i < comm_size_; ++i) {
 
         rdispls_patch_counts[i] = total_recv_patch_counts_flat;
         total_recv_patch_counts_flat += recv_counts_patch_counts[i];
@@ -188,15 +188,15 @@ void Solver::set_precomputations_data_IFGF()
 
     MPI_Alltoallv_c(flat_send_patch_counts_buffer.data(), send_counts_patch_counts.data(), sdispls_patch_counts.data(), MPI_COUNT,
                     flat_recv_patch_counts_buffer.data(), recv_counts_patch_counts.data(), rdispls_patch_counts.data(), MPI_COUNT,
-                    MPI_COMM_WORLD);
+                    mpi_comm_);
 
     flat_send_patch_counts_buffer.clear();
 
-    std::vector<MPI_Count> send_counts_patches_data(world_size_);
-    std::vector<MPI_Aint> sdispls_patches_data(world_size_);
+    std::vector<MPI_Count> send_counts_patches_data(comm_size_);
+    std::vector<MPI_Aint> sdispls_patches_data(comm_size_);
     MPI_Count total_send_patches_data_flat = 0;
 
-    for (int i = 0; i < world_size_; ++i) {
+    for (int i = 0; i < comm_size_; ++i) {
 
         send_counts_patches_data[i] = static_cast<MPI_Count>(patches_data_to_send_back[i].size());
         sdispls_patches_data[i] = total_send_patches_data_flat;
@@ -207,7 +207,7 @@ void Solver::set_precomputations_data_IFGF()
     std::vector<long long> flat_send_patches_data_buffer(static_cast<size_t>(total_send_patches_data_flat));
     current_flat_send_pos = 0;
 
-    for (int i = 0; i < world_size_; ++i) {
+    for (int i = 0; i < comm_size_; ++i) {
 
         std::copy(patches_data_to_send_back[i].begin(), patches_data_to_send_back[i].end(),
                 flat_send_patches_data_buffer.begin() + current_flat_send_pos);
@@ -217,15 +217,15 @@ void Solver::set_precomputations_data_IFGF()
 
     patches_data_to_send_back.clear();
 
-    std::vector<MPI_Count> recv_counts_patches_data(world_size_);
+    std::vector<MPI_Count> recv_counts_patches_data(comm_size_);
 
     MPI_Alltoall(send_counts_patches_data.data(), 1, MPI_COUNT,
-                    recv_counts_patches_data.data(), 1, MPI_COUNT, MPI_COMM_WORLD);
+                    recv_counts_patches_data.data(), 1, MPI_COUNT, mpi_comm_);
 
     MPI_Count total_recv_patches_data_flat = 0;
-    std::vector<MPI_Aint> rdispls_patches_data(world_size_);
+    std::vector<MPI_Aint> rdispls_patches_data(comm_size_);
 
-    for (int i = 0; i < world_size_; ++i) {
+    for (int i = 0; i < comm_size_; ++i) {
 
         rdispls_patches_data[i] = total_recv_patches_data_flat;
         total_recv_patches_data_flat += recv_counts_patches_data[i];
@@ -236,7 +236,7 @@ void Solver::set_precomputations_data_IFGF()
 
     MPI_Alltoallv_c(flat_send_patches_data_buffer.data(), send_counts_patches_data.data(), sdispls_patches_data.data(), MPI_LONG_LONG,
                     flat_recv_patches_data_buffer.data(), recv_counts_patches_data.data(), rdispls_patches_data.data(), MPI_LONG_LONG,
-                    MPI_COMM_WORLD);
+                    mpi_comm_);
 
     flat_send_patches_data_buffer.clear();
 
@@ -270,7 +270,7 @@ void Solver::set_precomputations_data_IFGF()
 void Solver::compute_new_order_points_RP() 
 {
 
-    std::vector<std::vector<long long>> points_not_in_rank(world_size_), order_points_not_in_rank(world_size_);
+    std::vector<std::vector<long long>> points_not_in_rank(comm_size_), order_points_not_in_rank(comm_size_);
 
     new_order_points_RP_ = std::vector<long long>(point_up_-point_low_);
 
@@ -280,9 +280,9 @@ void Solver::compute_new_order_points_RP()
 
         auto it = std::upper_bound(split_points_2_.begin(), split_points_2_.end(), point);
 
-        int rank = std::clamp<int>(static_cast<int>(std::distance(split_points_2_.begin(), it)) - 1, 0, world_size_-1);
+        int rank = std::clamp<int>(static_cast<int>(std::distance(split_points_2_.begin(), it)) - 1, 0, comm_size_-1);
 
-        if (world_rank_ == rank) {
+        if (comm_rank_ == rank) {
 
             new_order_points_RP_[point - point_low_] = i;
 
@@ -295,11 +295,11 @@ void Solver::compute_new_order_points_RP()
 
     }
 
-    std::vector<MPI_Count> send_counts_points(world_size_);
-    std::vector<MPI_Aint> sdispls_points(world_size_);
+    std::vector<MPI_Count> send_counts_points(comm_size_);
+    std::vector<MPI_Aint> sdispls_points(comm_size_);
     MPI_Count total_send_points = 0;    
 
-    for (int i = 0; i < world_size_; ++i) {
+    for (int i = 0; i < comm_size_; ++i) {
 
         send_counts_points[i] = static_cast<MPI_Count>(points_not_in_rank[i].size());
         sdispls_points[i] = total_send_points;
@@ -312,7 +312,7 @@ void Solver::compute_new_order_points_RP()
 
     MPI_Aint current_point_pos = 0;
 
-    for (int i = 0; i < world_size_; ++i) {
+    for (int i = 0; i < comm_size_; ++i) {
 
         std::copy(points_not_in_rank[i].begin(), points_not_in_rank[i].end(),
                     flat_send_points_buffer.begin() + current_point_pos);
@@ -325,14 +325,14 @@ void Solver::compute_new_order_points_RP()
     points_not_in_rank.clear();
     order_points_not_in_rank.clear();
 
-    std::vector<MPI_Count> recv_counts_points(world_size_);
+    std::vector<MPI_Count> recv_counts_points(comm_size_);
 
-    MPI_Alltoall(send_counts_points.data(), 1, MPI_COUNT, recv_counts_points.data(), 1, MPI_COUNT, MPI_COMM_WORLD);
+    MPI_Alltoall(send_counts_points.data(), 1, MPI_COUNT, recv_counts_points.data(), 1, MPI_COUNT, mpi_comm_);
 
-    std::vector<MPI_Aint> rdispls_points(world_size_);
+    std::vector<MPI_Aint> rdispls_points(comm_size_);
     MPI_Count total_recv_points = 0;
 
-    for (int i = 0; i < world_size_; ++i) {
+    for (int i = 0; i < comm_size_; ++i) {
 
         rdispls_points[i] = total_recv_points;
         total_recv_points += recv_counts_points[i];
@@ -344,11 +344,11 @@ void Solver::compute_new_order_points_RP()
 
     MPI_Alltoallv_c(flat_send_points_buffer.data(), send_counts_points.data(), sdispls_points.data(), MPI_LONG_LONG,
                     flat_recv_points_buffer.data(), recv_counts_points.data(), rdispls_points.data(), MPI_LONG_LONG,
-                    MPI_COMM_WORLD);
+                    mpi_comm_);
 
     MPI_Alltoallv_c(flat_send_orders_buffer.data(), send_counts_points.data(), sdispls_points.data(), MPI_LONG_LONG, 
                     flat_recv_orders_buffer.data(), recv_counts_points.data(), rdispls_points.data(), MPI_LONG_LONG, 
-                    MPI_COMM_WORLD);
+                    mpi_comm_);
 
     flat_send_points_buffer.clear();
     flat_send_orders_buffer.clear();
@@ -419,19 +419,19 @@ void Solver::check_patch_in_neighbours()
     MPI_Count total_1 = patches_loc.size();
     MPI_Count total_2 = boxes_loc.size();
 
-    std::vector<MPI_Count> recv_counts_1(world_size_);
-    std::vector<MPI_Count> recv_counts_2(world_size_);
+    std::vector<MPI_Count> recv_counts_1(comm_size_);
+    std::vector<MPI_Count> recv_counts_2(comm_size_);
 
-    MPI_Allgather(&total_1, 1, MPI_COUNT, &recv_counts_1[0], 1, MPI_COUNT, MPI_COMM_WORLD);
-    MPI_Allgather(&total_2, 1, MPI_COUNT, &recv_counts_2[0], 1, MPI_COUNT, MPI_COMM_WORLD);
+    MPI_Allgather(&total_1, 1, MPI_COUNT, &recv_counts_1[0], 1, MPI_COUNT, mpi_comm_);
+    MPI_Allgather(&total_2, 1, MPI_COUNT, &recv_counts_2[0], 1, MPI_COUNT, mpi_comm_);
 
-    std::vector<MPI_Aint> displs_1(world_size_, 0);
-    std::vector<MPI_Aint> displs_2(world_size_, 0);
+    std::vector<MPI_Aint> displs_1(comm_size_, 0);
+    std::vector<MPI_Aint> displs_2(comm_size_, 0);
 
     MPI_Count total_1_all = 0;
     MPI_Count total_2_all = 0;
 
-    for (int i = 0; i < world_size_; i++) {
+    for (int i = 0; i < comm_size_; i++) {
 
         displs_1[i] = total_1_all;
         displs_2[i] = total_2_all;
@@ -445,9 +445,9 @@ void Solver::check_patch_in_neighbours()
     std::vector<long long> size_all(total_1_all);
     std::vector<long long> boxes_all(total_2_all);
 
-    MPI_Allgatherv_c(&patches_loc[0], total_1, MPI_LONG_LONG, &patches_all[0], &recv_counts_1[0], &displs_1[0], MPI_LONG_LONG, MPI_COMM_WORLD);
-    MPI_Allgatherv_c(&size_loc[0], total_1, MPI_LONG_LONG, &size_all[0], &recv_counts_1[0], &displs_1[0], MPI_LONG_LONG, MPI_COMM_WORLD);
-    MPI_Allgatherv_c(&boxes_loc[0], total_2, MPI_LONG_LONG, &boxes_all[0], &recv_counts_2[0], &displs_2[0], MPI_LONG_LONG, MPI_COMM_WORLD);
+    MPI_Allgatherv_c(&patches_loc[0], total_1, MPI_LONG_LONG, &patches_all[0], &recv_counts_1[0], &displs_1[0], MPI_LONG_LONG, mpi_comm_);
+    MPI_Allgatherv_c(&size_loc[0], total_1, MPI_LONG_LONG, &size_all[0], &recv_counts_1[0], &displs_1[0], MPI_LONG_LONG, mpi_comm_);
+    MPI_Allgatherv_c(&boxes_loc[0], total_2, MPI_LONG_LONG, &boxes_all[0], &recv_counts_2[0], &displs_2[0], MPI_LONG_LONG, mpi_comm_);
 
     std::vector<long long>().swap(patches_loc);
     std::vector<long long>().swap(size_loc);

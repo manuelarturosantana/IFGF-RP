@@ -37,8 +37,9 @@ class BoxTree
 
     private:
 
-        int world_rank_;
-        int world_size_;
+        int comm_rank_;
+        int comm_size_;
+        MPI_Comm mpi_comm_;
 
         std::vector<long long> split_points_orig_;
         std::vector<MPI_Count> recv_counts_orig_;
@@ -83,19 +84,19 @@ class BoxTree
 
             InitializeMPI();
 
-            MPI_Barrier(MPI_COMM_WORLD);
+            MPI_Barrier(mpi_comm_);
 
             InitializeBoxesAndLevels();
 
-            MPI_Barrier(MPI_COMM_WORLD);
+            MPI_Barrier(mpi_comm_);
 
             InitializeRelevantConeSegments();
 
-            MPI_Barrier(MPI_COMM_WORLD);
+            MPI_Barrier(mpi_comm_);
 
             InitializePointsNotInRank();
 
-            MPI_Barrier(MPI_COMM_WORLD);
+            MPI_Barrier(mpi_comm_);
 
         }
 
@@ -108,11 +109,11 @@ class BoxTree
             if (!init)
                 throw std::logic_error("MPI needs to be initialized before calling the BoxTree\n");
 
-            MPI_Comm_size(MPI_COMM_WORLD, &world_size_);
-            MPI_Comm_rank(MPI_COMM_WORLD, &world_rank_);
+            MPI_Comm_size(mpi_comm_, &comm_size_);
+            MPI_Comm_rank(mpi_comm_, &comm_rank_);
 
-            point_low_ = split_points_orig_[world_rank_];
-            point_up_ = split_points_orig_[world_rank_+1];
+            point_low_ = split_points_orig_[comm_rank_];
+            point_up_ = split_points_orig_[comm_rank_+1];
 
         }
 
@@ -134,8 +135,8 @@ class BoxTree
                 
             }
 
-            MPI_Allreduce(&min_loc[0], &min[0], 3, MPI_DOUBLE, MPI_MIN, MPI_COMM_WORLD);
-            MPI_Allreduce(&max_loc[0], &max[0], 3, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD);
+            MPI_Allreduce(&min_loc[0], &min[0], 3, MPI_DOUBLE, MPI_MIN, mpi_comm_);
+            MPI_Allreduce(&max_loc[0], &max[0], 3, MPI_DOUBLE, MPI_MAX, mpi_comm_);
 
             max[0] += 1e-10;
             max[1] += 1e-10;
@@ -187,14 +188,14 @@ class BoxTree
 
                 MPI_Count size_loc = morton_box_loc.size();
 
-                std::vector<MPI_Count> recv_counts(world_size_);
-                std::vector<MPI_Aint> displs(world_size_);
+                std::vector<MPI_Count> recv_counts(comm_size_);
+                std::vector<MPI_Aint> displs(comm_size_);
 
-                MPI_Allgather(&size_loc, 1, MPI_COUNT, &recv_counts[0], 1, MPI_COUNT, MPI_COMM_WORLD);
+                MPI_Allgather(&size_loc, 1, MPI_COUNT, &recv_counts[0], 1, MPI_COUNT, mpi_comm_);
 
                 MPI_Count size_all = 0;                
 
-                for (int rank = 0; rank < world_size_; rank++) {
+                for (int rank = 0; rank < comm_size_; rank++) {
 
                     displs[rank] = size_all;
                     size_all += recv_counts[rank];
@@ -204,8 +205,8 @@ class BoxTree
                 std::vector<long long> morton_box_all(static_cast<size_t>(size_all));
                 std::vector<long long> morton_box_count_all(static_cast<size_t>(size_all));
 
-                MPI_Allgatherv_c(&morton_box_loc[0], size_loc, MPI_LONG_LONG, &morton_box_all[0], &recv_counts[0], &displs[0], MPI_LONG_LONG, MPI_COMM_WORLD);
-                MPI_Allgatherv_c(&morton_box_count_loc[0], size_loc, MPI_LONG_LONG, &morton_box_count_all[0], &recv_counts[0], &displs[0], MPI_LONG_LONG, MPI_COMM_WORLD);
+                MPI_Allgatherv_c(&morton_box_loc[0], size_loc, MPI_LONG_LONG, &morton_box_all[0], &recv_counts[0], &displs[0], MPI_LONG_LONG, mpi_comm_);
+                MPI_Allgatherv_c(&morton_box_count_loc[0], size_loc, MPI_LONG_LONG, &morton_box_count_all[0], &recv_counts[0], &displs[0], MPI_LONG_LONG, mpi_comm_);
 
                 std::vector<long long>().swap(morton_box_loc);
                 std::vector<long long>().swap(morton_box_count_loc);
@@ -240,7 +241,7 @@ class BoxTree
 
             nlevels_ = nlevels-1;
 
-            if (world_rank_ == 0) {
+            if (comm_rank_ == 0) {
 
                 std::cout << "Number of levels = " << nlevels_ << "\n";
 
@@ -287,7 +288,7 @@ class BoxTree
             
             long long local_max = *std::max_element(local_data.begin(), local_data.end());
             long long global_max;
-            MPI_Allreduce(&local_max, &global_max, 1, MPI_LONG_LONG, MPI_MAX, MPI_COMM_WORLD);
+            MPI_Allreduce(&local_max, &global_max, 1, MPI_LONG_LONG, MPI_MAX, mpi_comm_);
         
             for (long long exp = 1; global_max / exp > 0; exp *= 10) {
 
@@ -302,20 +303,20 @@ class BoxTree
                 }    
                 
                 std::vector<long long> global_counts(10, 0);
-                MPI_Allreduce(local_counts.data(), global_counts.data(), 10, MPI_LONG_LONG, MPI_SUM, MPI_COMM_WORLD);
+                MPI_Allreduce(local_counts.data(), global_counts.data(), 10, MPI_LONG_LONG, MPI_SUM, mpi_comm_);
 
                 std::vector<long long> partial_counts(10, 0);
-                MPI_Exscan(local_counts.data(), partial_counts.data(), 10, MPI_LONG_LONG, MPI_SUM, MPI_COMM_WORLD);
+                MPI_Exscan(local_counts.data(), partial_counts.data(), 10, MPI_LONG_LONG, MPI_SUM, mpi_comm_);
 
                 std::vector<long long> global_displs(11, 0);
                 for (int i = 1; i < 11; i++) {
                     global_displs[i] = global_displs[i-1] + global_counts[i-1];
                 }
 
-                std::vector<MPI_Count> send_counts(world_size_, 0);
-                std::vector<MPI_Aint> send_displs(world_size_, 0);                
+                std::vector<MPI_Count> send_counts(comm_size_, 0);
+                std::vector<MPI_Aint> send_displs(comm_size_, 0);                
 
-                for (int i = 0; i < world_size_; ++i) {
+                for (int i = 0; i < comm_size_; ++i) {
 
                     long long pos_low = split_points_orig_[i];
                     long long pos_up = split_points_orig_[i+1]-1;
@@ -378,12 +379,12 @@ class BoxTree
 
                 }
 
-                std::vector<MPI_Count> recv_counts(world_size_, 0);
-                std::vector<MPI_Aint> recv_displs(world_size_, 0);
+                std::vector<MPI_Count> recv_counts(comm_size_, 0);
+                std::vector<MPI_Aint> recv_displs(comm_size_, 0);
 
-                MPI_Alltoall(send_counts.data(), 1, MPI_COUNT, recv_counts.data(), 1, MPI_COUNT, MPI_COMM_WORLD);
+                MPI_Alltoall(send_counts.data(), 1, MPI_COUNT, recv_counts.data(), 1, MPI_COUNT, mpi_comm_);
                 
-                for (int i = 1; i < world_size_; ++i) {
+                for (int i = 1; i < comm_size_; ++i) {
 
                     recv_displs[i] = recv_displs[i-1] + recv_counts[i-1];
 
@@ -394,10 +395,10 @@ class BoxTree
 
                 MPI_Alltoallv_c(local_data.data(), send_counts.data(), send_displs.data(), MPI_LONG_LONG,
                                 new_local_data.data(), recv_counts.data(), recv_displs.data(), MPI_LONG_LONG,
-                                MPI_COMM_WORLD);
+                                mpi_comm_);
                 MPI_Alltoallv_c(local_order.data(), send_counts.data(), send_displs.data(), MPI_LONG_LONG,
                                 new_local_order.data(), recv_counts.data(), recv_displs.data(), MPI_LONG_LONG,
-                                MPI_COMM_WORLD);
+                                mpi_comm_);
 
                 local_data.swap(new_local_data);
                 local_order.swap(new_local_order);
@@ -425,23 +426,23 @@ class BoxTree
 
             std::vector<long long>().swap(morton_code);
 
-            std::vector<MPI_Count> send_counts(world_size_, 0);
+            std::vector<MPI_Count> send_counts(comm_size_, 0);
 
             for (long long i = 0; i < N_loc_orig_; i++) {
 
                 auto it = std::upper_bound(split_points_orig_.begin(), split_points_orig_.end(), sorting_[i]);
 
-                int rank = std::clamp<int>(static_cast<int>(std::distance(split_points_orig_.begin(), it)) - 1, 0, world_size_-1);
+                int rank = std::clamp<int>(static_cast<int>(std::distance(split_points_orig_.begin(), it)) - 1, 0, comm_size_-1);
 
                 send_counts[rank]++;
 
             }
 
-            std::vector<MPI_Count> recv_counts(world_size_);
+            std::vector<MPI_Count> recv_counts(comm_size_);
 
-            MPI_Alltoall(send_counts.data(), 1, MPI_COUNT, recv_counts.data(), 1, MPI_COUNT, MPI_COMM_WORLD);
+            MPI_Alltoall(send_counts.data(), 1, MPI_COUNT, recv_counts.data(), 1, MPI_COUNT, mpi_comm_);
 
-            std::vector<MPI_Aint> send_displs(world_size_), recv_displs(world_size_);
+            std::vector<MPI_Aint> send_displs(comm_size_), recv_displs(comm_size_);
 
             std::exclusive_scan(send_counts.begin(), send_counts.end(), send_displs.begin(), 0);
             std::exclusive_scan(recv_counts.begin(), recv_counts.end(), recv_displs.begin(), 0);
@@ -455,7 +456,7 @@ class BoxTree
 
                 auto it = std::upper_bound(split_points_orig_.begin(), split_points_orig_.end(), sorting_[i]);
                 
-                int rank = std::clamp<int>(static_cast<int>(std::distance(split_points_orig_.begin(), it)) - 1, 0, world_size_ - 1);
+                int rank = std::clamp<int>(static_cast<int>(std::distance(split_points_orig_.begin(), it)) - 1, 0, comm_size_ - 1);
 
                 long long pos = local_offsets[rank];
                 send_idx[pos] = sorting_[i];
@@ -471,7 +472,7 @@ class BoxTree
 
             MPI_Alltoallv_c(send_idx.data(), send_counts.data(), send_displs.data(), MPI_LONG_LONG,
                             sorting_send.data(), recv_counts.data(), recv_displs.data(), MPI_LONG_LONG,
-                            MPI_COMM_WORLD);
+                            mpi_comm_);
 
             std::vector<long long>().swap(send_idx);
 
@@ -494,22 +495,22 @@ class BoxTree
 
             MPI_Alltoallv_c(x_send.data(), recv_counts.data(), recv_displs.data(), MPI_DOUBLE,
                             x_.data(), send_counts.data(), send_displs.data(), MPI_DOUBLE,
-                            MPI_COMM_WORLD);
+                            mpi_comm_);
             MPI_Alltoallv_c(y_send.data(), recv_counts.data(), recv_displs.data(), MPI_DOUBLE,
                             y_.data(), send_counts.data(), send_displs.data(), MPI_DOUBLE,
-                            MPI_COMM_WORLD);
+                            mpi_comm_);
             MPI_Alltoallv_c(z_send.data(), recv_counts.data(), recv_displs.data(), MPI_DOUBLE,
                             z_.data(), send_counts.data(), send_displs.data(), MPI_DOUBLE,
-                            MPI_COMM_WORLD);
+                            mpi_comm_);
             MPI_Alltoallv_c(nx_send.data(), recv_counts.data(), recv_displs.data(), MPI_DOUBLE,
                             normal_x_.data(), send_counts.data(), send_displs.data(), MPI_DOUBLE,
-                            MPI_COMM_WORLD);
+                            mpi_comm_);
             MPI_Alltoallv_c(ny_send.data(), recv_counts.data(), recv_displs.data(), MPI_DOUBLE,
                             normal_y_.data(), send_counts.data(), send_displs.data(), MPI_DOUBLE,
-                            MPI_COMM_WORLD);
+                            mpi_comm_);
             MPI_Alltoallv_c(nz_send.data(), recv_counts.data(), recv_displs.data(), MPI_DOUBLE,
                             normal_z_.data(), send_counts.data(), send_displs.data(), MPI_DOUBLE,
-                            MPI_COMM_WORLD);
+                            mpi_comm_);
 
             #pragma omp parallel for
             for (long long i = 0; i < N_loc_orig_; i++) {
@@ -588,13 +589,13 @@ class BoxTree
             std::vector<long long> relevantmorton_loc(levels_.back()->mortonidofrelboxes_.begin(), levels_.back()->mortonidofrelboxes_.end());
             MPI_Count numrelboxes_loc = relevantmorton_loc.size();
 
-            std::vector<MPI_Count> numrelboxes_all(world_size_);
-            MPI_Allgather(&numrelboxes_loc, 1, MPI_COUNT, &numrelboxes_all[0], 1, MPI_COUNT, MPI_COMM_WORLD);
+            std::vector<MPI_Count> numrelboxes_all(comm_size_);
+            MPI_Allgather(&numrelboxes_loc, 1, MPI_COUNT, &numrelboxes_all[0], 1, MPI_COUNT, mpi_comm_);
 
-            std::vector<MPI_Aint> displs(world_size_);
+            std::vector<MPI_Aint> displs(comm_size_);
             MPI_Count numrelboxes_total = 0;
 
-            for (int i = 0; i < world_size_; i++) {
+            for (int i = 0; i < comm_size_; i++) {
 
                 displs[i] = numrelboxes_total;
                 numrelboxes_total += numrelboxes_all[i];
@@ -602,7 +603,7 @@ class BoxTree
             }
             
             std::vector<long long> mortonidofrelboxes_all(static_cast<size_t>(numrelboxes_total));
-            MPI_Allgatherv_c(&relevantmorton_loc[0], numrelboxes_loc, MPI_LONG_LONG, &mortonidofrelboxes_all[0], &numrelboxes_all[0], &displs[0], MPI_LONG_LONG, MPI_COMM_WORLD);
+            MPI_Allgatherv_c(&relevantmorton_loc[0], numrelboxes_loc, MPI_LONG_LONG, &mortonidofrelboxes_all[0], &numrelboxes_all[0], &displs[0], MPI_LONG_LONG, mpi_comm_);
        
             std::vector<long long> relevantmortonown(levels_.back()->mortonidofrelboxes_.begin(), levels_.back()->mortonidofrelboxes_.end());
             std::sort(relevantmortonown.begin(), relevantmortonown.end());
@@ -707,14 +708,14 @@ class BoxTree
 
             MPI_Count total_size_loc = morton_box_loc.size();
 
-            std::vector<MPI_Count> recv_counts(world_size_);
-            std::vector<MPI_Aint> displs(world_size_);
+            std::vector<MPI_Count> recv_counts(comm_size_);
+            std::vector<MPI_Aint> displs(comm_size_);
 
-            MPI_Allgather(&total_size_loc, 1, MPI_COUNT, &recv_counts[0], 1, MPI_COUNT, MPI_COMM_WORLD);
+            MPI_Allgather(&total_size_loc, 1, MPI_COUNT, &recv_counts[0], 1, MPI_COUNT, mpi_comm_);
 
             MPI_Count total_size = 0;
 
-            for (int i = 0; i < world_size_; i++) {
+            for (int i = 0; i < comm_size_; i++) {
 
                 displs[i] = total_size;
                 total_size += recv_counts[i];
@@ -725,9 +726,9 @@ class BoxTree
             std::vector<long long> position_all(static_cast<size_t>(total_size));
             std::vector<long long> size_all(static_cast<size_t>(total_size));
 
-            MPI_Allgatherv_c(&morton_box_loc[0], total_size_loc, MPI_LONG_LONG, &morton_box_all[0], &recv_counts[0], &displs[0], MPI_LONG_LONG, MPI_COMM_WORLD);
-            MPI_Allgatherv_c(&position_loc[0], total_size_loc, MPI_LONG_LONG, &position_all[0], &recv_counts[0], &displs[0], MPI_LONG_LONG, MPI_COMM_WORLD);
-            MPI_Allgatherv_c(&size_loc[0], total_size_loc, MPI_LONG_LONG, &size_all[0], &recv_counts[0], &displs[0], MPI_LONG_LONG, MPI_COMM_WORLD);
+            MPI_Allgatherv_c(&morton_box_loc[0], total_size_loc, MPI_LONG_LONG, &morton_box_all[0], &recv_counts[0], &displs[0], MPI_LONG_LONG, mpi_comm_);
+            MPI_Allgatherv_c(&position_loc[0], total_size_loc, MPI_LONG_LONG, &position_all[0], &recv_counts[0], &displs[0], MPI_LONG_LONG, mpi_comm_);
+            MPI_Allgatherv_c(&size_loc[0], total_size_loc, MPI_LONG_LONG, &size_all[0], &recv_counts[0], &displs[0], MPI_LONG_LONG, mpi_comm_);
 
             std::vector<long long>().swap(morton_box_loc);
             std::vector<long long>().swap(position_loc);
@@ -1091,7 +1092,7 @@ class BoxTree
                 local_max = *std::max_element(mortonboxnonrelconesegment.begin(), mortonboxnonrelconesegment.end());
             }
             long long global_max;
-            MPI_Allreduce(&local_max, &global_max, 1, MPI_LONG_LONG, MPI_MAX, MPI_COMM_WORLD);
+            MPI_Allreduce(&local_max, &global_max, 1, MPI_LONG_LONG, MPI_MAX, mpi_comm_);
 
             for (long long exp = 1; global_max / exp > 0; exp *= 10) {
 
@@ -1108,30 +1109,30 @@ class BoxTree
                 }   
                 
                 std::vector<long long> global_counts(10, 0);
-                MPI_Allreduce(local_counts.data(), global_counts.data(), 10, MPI_LONG_LONG, MPI_SUM, MPI_COMM_WORLD);
+                MPI_Allreduce(local_counts.data(), global_counts.data(), 10, MPI_LONG_LONG, MPI_SUM, mpi_comm_);
 
                 std::vector<long long> partial_counts(10, 0);
-                MPI_Exscan(local_counts.data(), partial_counts.data(), 10, MPI_LONG_LONG, MPI_SUM, MPI_COMM_WORLD);
+                MPI_Exscan(local_counts.data(), partial_counts.data(), 10, MPI_LONG_LONG, MPI_SUM, mpi_comm_);
 
                 std::vector<long long> global_displs(11, 0);
                 for (int i = 1; i < 11; i++) {
                     global_displs[i] = global_displs[i-1] + global_counts[i-1];
                 }
 
-                std::vector<MPI_Count> send_counts(world_size_, 0);
-                std::vector<MPI_Aint> send_displs(world_size_, 0);  
+                std::vector<MPI_Count> send_counts(comm_size_, 0);
+                std::vector<MPI_Aint> send_displs(comm_size_, 0);  
                 
                 long long N_exp = 0;
                 for (int i = 0; i < 10; i++) {
                     N_exp += global_counts[i];
                 }
 
-                long long N_loc = N_exp / world_size_;
-                long long N_loc_rem = N_exp % world_size_;
+                long long N_loc = N_exp / comm_size_;
+                long long N_loc_rem = N_exp % comm_size_;
 
-                std::vector<long long> split_points_loc(world_size_+1, 0);
+                std::vector<long long> split_points_loc(comm_size_+1, 0);
 
-                for (int i = 1; i <= world_size_; i++) {
+                for (int i = 1; i <= comm_size_; i++) {
 
                     split_points_loc[i] = split_points_loc[i-1] + N_loc;
 
@@ -1144,7 +1145,7 @@ class BoxTree
 
                 }
 
-                for (int i = 0; i < world_size_; ++i) {
+                for (int i = 0; i < comm_size_; ++i) {
 
                     long long pos_low = split_points_loc[i];
                     long long pos_up = split_points_loc[i+1]-1;
@@ -1207,22 +1208,22 @@ class BoxTree
 
                 }
 
-                std::vector<MPI_Count> recv_counts(world_size_, 0);
-                std::vector<MPI_Aint> recv_displs(world_size_, 0);
+                std::vector<MPI_Count> recv_counts(comm_size_, 0);
+                std::vector<MPI_Aint> recv_displs(comm_size_, 0);
 
-                MPI_Alltoall(send_counts.data(), 1, MPI_COUNT, recv_counts.data(), 1, MPI_COUNT, MPI_COMM_WORLD);
+                MPI_Alltoall(send_counts.data(), 1, MPI_COUNT, recv_counts.data(), 1, MPI_COUNT, mpi_comm_);
                 
-                for (int i = 1; i < world_size_; ++i) {
+                for (int i = 1; i < comm_size_; ++i) {
 
                     recv_displs[i] = recv_displs[i-1] + recv_counts[i-1];
 
                 }
 
-                std::vector<long long> new_mortonboxnonrelconesegment(split_points_loc[world_rank_+1] - split_points_loc[world_rank_]);
+                std::vector<long long> new_mortonboxnonrelconesegment(split_points_loc[comm_rank_+1] - split_points_loc[comm_rank_]);
 
                 MPI_Alltoallv_c(mortonboxnonrelconesegment.data(), send_counts.data(), send_displs.data(), MPI_LONG_LONG,
                                 new_mortonboxnonrelconesegment.data(), recv_counts.data(), recv_displs.data(), MPI_LONG_LONG,
-                                MPI_COMM_WORLD);
+                                mpi_comm_);
 
                 mortonboxnonrelconesegment = new_mortonboxnonrelconesegment;
 
@@ -1243,22 +1244,22 @@ class BoxTree
                 last_elem = mortonboxnonrelconesegment.back();
             }
 
-            std::vector<long long> first_elem_all(world_size_);
-            std::vector<long long> last_elem_all(world_size_);
+            std::vector<long long> first_elem_all(comm_size_);
+            std::vector<long long> last_elem_all(comm_size_);
 
-            MPI_Allgather(&first_elem, 1, MPI_LONG_LONG, &first_elem_all[0], 1, MPI_LONG_LONG, MPI_COMM_WORLD);
-            MPI_Allgather(&last_elem, 1, MPI_LONG_LONG, &last_elem_all[0], 1, MPI_LONG_LONG, MPI_COMM_WORLD);
+            MPI_Allgather(&first_elem, 1, MPI_LONG_LONG, &first_elem_all[0], 1, MPI_LONG_LONG, mpi_comm_);
+            MPI_Allgather(&last_elem, 1, MPI_LONG_LONG, &last_elem_all[0], 1, MPI_LONG_LONG, mpi_comm_);
 
             first_elem_all.push_back(last_elem_all.back()+1);
 
             if (first_elem_all.back() == 0) {
 
-                first_elem_all[world_size_] = -1;
+                first_elem_all[comm_size_] = -1;
 
                 auto it = std::find(first_elem_all.begin(), first_elem_all.end(), -1);
                 int pos = std::distance(first_elem_all.begin(), it);
 
-                for (int rank = pos; rank <= world_size_; rank++) {
+                for (int rank = pos; rank <= comm_size_; rank++) {
 
                     first_elem_all[rank] = first_elem_all[pos-1] + 1;
 
@@ -1276,7 +1277,7 @@ class BoxTree
                                               const std::unordered_set<long long>& propagation_conesegments) 
         {
 
-            std::vector<std::vector<long long>> propagation_not_in_rank(world_size_);
+            std::vector<std::vector<long long>> propagation_not_in_rank(comm_size_);
 
             for (long long cone_segment : propagation_conesegments) {
 
@@ -1284,9 +1285,9 @@ class BoxTree
 
                 int rank = static_cast<int>(std::distance(levels_[level]->split_points_relconesegments_.begin(), it)) - 1;
                 if (rank < 0) rank = 0;
-                if (rank >= world_size_) rank = world_size_ - 1;            
+                if (rank >= comm_size_) rank = comm_size_ - 1;            
 
-                if (rank != world_rank_) {
+                if (rank != comm_rank_) {
 
                     propagation_not_in_rank[rank].push_back(cone_segment);
 
@@ -1294,11 +1295,11 @@ class BoxTree
 
             }
 
-            levels_[level]->send_counts_propagation_.resize(world_size_);
-            levels_[level]->sdispls_propagation_.resize(world_size_);
+            levels_[level]->send_counts_propagation_.resize(comm_size_);
+            levels_[level]->sdispls_propagation_.resize(comm_size_);
             MPI_Count total_send_local = 0;
 
-            for (int i = 0; i < world_size_; ++i) {
+            for (int i = 0; i < comm_size_; ++i) {
 
                 levels_[level]->sdispls_propagation_[i] = total_send_local;
                 levels_[level]->send_counts_propagation_[i] = static_cast<MPI_Count>(propagation_not_in_rank[i].size());
@@ -1310,7 +1311,7 @@ class BoxTree
 
             MPI_Aint current_pos = 0;
     
-            for (int i = 0; i < world_size_; ++i) {
+            for (int i = 0; i < comm_size_; ++i) {
 
                 std::copy(propagation_not_in_rank[i].begin(), propagation_not_in_rank[i].end(),
                           levels_[level]->flat_send_buffer_propagation_.begin() + current_pos);
@@ -1320,14 +1321,14 @@ class BoxTree
 
             propagation_not_in_rank.clear();
 
-            std::vector<MPI_Count> recv_counts_propagation(world_size_); 
+            std::vector<MPI_Count> recv_counts_propagation(comm_size_); 
 
-            MPI_Alltoall(levels_[level]->send_counts_propagation_.data(), 1, MPI_COUNT, recv_counts_propagation.data(), 1, MPI_COUNT, MPI_COMM_WORLD);
+            MPI_Alltoall(levels_[level]->send_counts_propagation_.data(), 1, MPI_COUNT, recv_counts_propagation.data(), 1, MPI_COUNT, mpi_comm_);
 
-            std::vector<MPI_Aint> rdispls_propagation(world_size_);
+            std::vector<MPI_Aint> rdispls_propagation(comm_size_);
             MPI_Count total_received_size = 0;
 
-            for (int i = 0; i < world_size_; ++i) {
+            for (int i = 0; i < comm_size_; ++i) {
 
                 rdispls_propagation[i] = total_received_size;
                 total_received_size += recv_counts_propagation[i];
@@ -1338,7 +1339,7 @@ class BoxTree
 
             MPI_Alltoallv_c(levels_[level]->flat_send_buffer_propagation_.data(), levels_[level]->send_counts_propagation_.data(), levels_[level]->sdispls_propagation_.data(), MPI_LONG_LONG,
                             flat_recv_buffer_propagation.data(), recv_counts_propagation.data(), rdispls_propagation.data(), MPI_LONG_LONG, 
-                            MPI_COMM_WORLD);   
+                            mpi_comm_);   
 
             std::vector<long long> pos_send_back_propagation(total_received_size);
 
@@ -1361,13 +1362,13 @@ class BoxTree
             
             MPI_Alltoallv_c(pos_send_back_propagation.data(), recv_counts_propagation.data(), rdispls_propagation.data(), MPI_LONG_LONG,
                             pos_recv_back_propagation.data(), levels_[level]->send_counts_propagation_.data(), levels_[level]->sdispls_propagation_.data(), MPI_LONG_LONG, 
-                            MPI_COMM_WORLD); 
+                            mpi_comm_); 
 
             pos_send_back_propagation.clear();
             
             levels_[level]->flat_pos_propagation_ = std::move(pos_recv_back_propagation);
 
-            std::vector<std::vector<long long>> interpolation_not_in_rank(world_size_);
+            std::vector<std::vector<long long>> interpolation_not_in_rank(comm_size_);
 
             for (long long cone_segment : interpolation_conesegments) {
 
@@ -1375,9 +1376,9 @@ class BoxTree
 
                 int rank = static_cast<int>(std::distance(levels_[level]->split_points_relconesegments_.begin(), it)) - 1;
                 if (rank < 0) rank = 0;
-                if (rank >= world_size_) rank = world_size_ - 1;            
+                if (rank >= comm_size_) rank = comm_size_ - 1;            
 
-                if (rank != world_rank_) {
+                if (rank != comm_rank_) {
 
                     interpolation_not_in_rank[rank].push_back(cone_segment);
 
@@ -1385,11 +1386,11 @@ class BoxTree
 
             }
 
-            levels_[level]->send_counts_interpolation_.resize(world_size_);
-            levels_[level]->sdispls_interpolation_.resize(world_size_);
+            levels_[level]->send_counts_interpolation_.resize(comm_size_);
+            levels_[level]->sdispls_interpolation_.resize(comm_size_);
             total_send_local = 0;
 
-            for (int i = 0; i < world_size_; ++i) {
+            for (int i = 0; i < comm_size_; ++i) {
 
                 levels_[level]->sdispls_interpolation_[i] = total_send_local;
                 levels_[level]->send_counts_interpolation_[i] = static_cast<MPI_Count>(interpolation_not_in_rank[i].size());
@@ -1401,7 +1402,7 @@ class BoxTree
 
             current_pos = 0;
     
-            for (int i = 0; i < world_size_; ++i) {
+            for (int i = 0; i < comm_size_; ++i) {
 
                 std::copy(interpolation_not_in_rank[i].begin(), interpolation_not_in_rank[i].end(),
                           levels_[level]->flat_send_buffer_interpolation_.begin() + current_pos);
@@ -1411,14 +1412,14 @@ class BoxTree
 
             interpolation_not_in_rank.clear();
 
-            std::vector<MPI_Count> recv_counts_interpolation(world_size_); 
+            std::vector<MPI_Count> recv_counts_interpolation(comm_size_); 
 
-            MPI_Alltoall(levels_[level]->send_counts_interpolation_.data(), 1, MPI_COUNT, recv_counts_interpolation.data(), 1, MPI_COUNT, MPI_COMM_WORLD);
+            MPI_Alltoall(levels_[level]->send_counts_interpolation_.data(), 1, MPI_COUNT, recv_counts_interpolation.data(), 1, MPI_COUNT, mpi_comm_);
 
-            std::vector<MPI_Aint> rdispls_interpolation(world_size_);
+            std::vector<MPI_Aint> rdispls_interpolation(comm_size_);
             total_received_size = 0;
 
-            for (int i = 0; i < world_size_; ++i) {
+            for (int i = 0; i < comm_size_; ++i) {
 
                 rdispls_interpolation[i] = total_received_size;
                 total_received_size += recv_counts_interpolation[i];
@@ -1429,7 +1430,7 @@ class BoxTree
 
             MPI_Alltoallv_c(levels_[level]->flat_send_buffer_interpolation_.data(), levels_[level]->send_counts_interpolation_.data(), levels_[level]->sdispls_interpolation_.data(), MPI_LONG_LONG,
                             flat_recv_buffer_interpolation.data(), recv_counts_interpolation.data(), rdispls_interpolation.data(), MPI_LONG_LONG, 
-                            MPI_COMM_WORLD);   
+                            mpi_comm_);   
 
             std::vector<long long> pos_send_back_interpolation(total_received_size);
 
@@ -1452,7 +1453,7 @@ class BoxTree
             
             MPI_Alltoallv_c(pos_send_back_interpolation.data(), recv_counts_interpolation.data(), rdispls_interpolation.data(), MPI_LONG_LONG,
                             pos_recv_back_interpolation.data(), levels_[level]->send_counts_interpolation_.data(), levels_[level]->sdispls_interpolation_.data(), MPI_LONG_LONG, 
-                            MPI_COMM_WORLD); 
+                            mpi_comm_); 
 
             pos_send_back_interpolation.clear();
             
@@ -1487,13 +1488,13 @@ class BoxTree
 
             MPI_Count total_size_loc = morton_box_loc.size();
 
-            std::vector<MPI_Count> recv_counts(world_size_);
-            MPI_Allgather(&total_size_loc, 1, MPI_COUNT, &recv_counts[0], 1, MPI_COUNT, MPI_COMM_WORLD);
+            std::vector<MPI_Count> recv_counts(comm_size_);
+            MPI_Allgather(&total_size_loc, 1, MPI_COUNT, &recv_counts[0], 1, MPI_COUNT, mpi_comm_);
 
-            std::vector<MPI_Aint> displs(world_size_);
+            std::vector<MPI_Aint> displs(comm_size_);
             MPI_Count total_size = 0;
 
-            for (int i = 0; i < world_size_; i++) {
+            for (int i = 0; i < comm_size_; i++) {
 
                 displs[i] = total_size;
                 total_size += recv_counts[i];
@@ -1504,9 +1505,9 @@ class BoxTree
             std::vector<long long> position_all(static_cast<size_t>(total_size));
             std::vector<long long> size_all(static_cast<size_t>(total_size));
 
-            MPI_Allgatherv_c(&morton_box_loc[0], total_size_loc, MPI_LONG_LONG, &morton_box_all[0], &recv_counts[0], &displs[0], MPI_LONG_LONG, MPI_COMM_WORLD);
-            MPI_Allgatherv_c(&position_loc[0], total_size_loc, MPI_LONG_LONG, &position_all[0], &recv_counts[0], &displs[0], MPI_LONG_LONG, MPI_COMM_WORLD);
-            MPI_Allgatherv_c(&size_loc[0], total_size_loc, MPI_LONG_LONG, &size_all[0], &recv_counts[0], &displs[0], MPI_LONG_LONG, MPI_COMM_WORLD);
+            MPI_Allgatherv_c(&morton_box_loc[0], total_size_loc, MPI_LONG_LONG, &morton_box_all[0], &recv_counts[0], &displs[0], MPI_LONG_LONG, mpi_comm_);
+            MPI_Allgatherv_c(&position_loc[0], total_size_loc, MPI_LONG_LONG, &position_all[0], &recv_counts[0], &displs[0], MPI_LONG_LONG, mpi_comm_);
+            MPI_Allgatherv_c(&size_loc[0], total_size_loc, MPI_LONG_LONG, &size_all[0], &recv_counts[0], &displs[0], MPI_LONG_LONG, mpi_comm_);
 
             std::vector<long long>().swap(morton_box_loc);
             std::vector<long long>().swap(position_loc);
@@ -1578,13 +1579,13 @@ class BoxTree
 
             MPI_Count total_size_loc = morton_box_loc.size();
 
-            std::vector<MPI_Count> recv_counts(world_size_);
-            MPI_Allgather(&total_size_loc, 1, MPI_COUNT, &recv_counts[0], 1, MPI_COUNT, MPI_COMM_WORLD);
+            std::vector<MPI_Count> recv_counts(comm_size_);
+            MPI_Allgather(&total_size_loc, 1, MPI_COUNT, &recv_counts[0], 1, MPI_COUNT, mpi_comm_);
 
-            std::vector<MPI_Aint> displs(world_size_);
+            std::vector<MPI_Aint> displs(comm_size_);
             MPI_Count total_size = 0;
 
-            for (int i = 0; i < world_size_; i++) {
+            for (int i = 0; i < comm_size_; i++) {
 
                 displs[i] = total_size;
                 total_size += recv_counts[i];
@@ -1595,9 +1596,9 @@ class BoxTree
             std::vector<long long> position_all(static_cast<size_t>(total_size));
             std::vector<long long> size_all(static_cast<size_t>(total_size));
 
-            MPI_Allgatherv_c(&morton_box_loc[0], total_size_loc, MPI_LONG_LONG, &morton_box_all[0], &recv_counts[0], &displs[0], MPI_LONG_LONG, MPI_COMM_WORLD);
-            MPI_Allgatherv_c(&position_loc[0], total_size_loc, MPI_LONG_LONG, &position_all[0], &recv_counts[0], &displs[0], MPI_LONG_LONG, MPI_COMM_WORLD);
-            MPI_Allgatherv_c(&size_loc[0], total_size_loc, MPI_LONG_LONG, &size_all[0], &recv_counts[0], &displs[0], MPI_LONG_LONG, MPI_COMM_WORLD);
+            MPI_Allgatherv_c(&morton_box_loc[0], total_size_loc, MPI_LONG_LONG, &morton_box_all[0], &recv_counts[0], &displs[0], MPI_LONG_LONG, mpi_comm_);
+            MPI_Allgatherv_c(&position_loc[0], total_size_loc, MPI_LONG_LONG, &position_all[0], &recv_counts[0], &displs[0], MPI_LONG_LONG, mpi_comm_);
+            MPI_Allgatherv_c(&size_loc[0], total_size_loc, MPI_LONG_LONG, &size_all[0], &recv_counts[0], &displs[0], MPI_LONG_LONG, mpi_comm_);
 
             std::vector<long long>().swap(morton_box_loc);
             std::vector<long long>().swap(position_loc);
@@ -1687,7 +1688,7 @@ class BoxTree
             #pragma omp parallel
             {
 
-            std::vector<std::unordered_set<long long>> points_not_in_rank_thread(world_size_);
+            std::vector<std::unordered_set<long long>> points_not_in_rank_thread(comm_size_);
             
             #pragma omp for
             for (long long i = 0; i < vec_mortonids.size(); i++) {
@@ -1706,9 +1707,9 @@ class BoxTree
                     for (long long j = 0; j < npoints; j++) {
 
                         auto it = std::upper_bound(split_points_orig_.begin(), split_points_orig_.end(), points_begin + j);
-                        int rank = std::clamp<int>(static_cast<int>(std::distance(split_points_orig_.begin(), it)) - 1, 0, world_size_-1);
+                        int rank = std::clamp<int>(static_cast<int>(std::distance(split_points_orig_.begin(), it)) - 1, 0, comm_size_-1);
 
-                        if (rank != world_rank_) points_not_in_rank_thread[rank].insert(points_begin + j);
+                        if (rank != comm_rank_) points_not_in_rank_thread[rank].insert(points_begin + j);
 
                     }
 
@@ -1719,7 +1720,7 @@ class BoxTree
             #pragma omp critical
             {
             
-                for (int i = 0; i < world_size_; i++) {
+                for (int i = 0; i < comm_size_; i++) {
 
                     points_not_in_rank[i].insert(points_not_in_rank_thread[i].begin(), points_not_in_rank_thread[i].end());
 
@@ -1740,7 +1741,7 @@ class BoxTree
             #pragma omp parallel
             {
 
-            std::vector<std::unordered_set<long long>> points_not_in_rank_thread(world_size_);
+            std::vector<std::unordered_set<long long>> points_not_in_rank_thread(comm_size_);
             long long old_morton_box = -1;
             
             #pragma omp for
@@ -1760,9 +1761,9 @@ class BoxTree
                 for (long long j = 0; j < npoints; j++) {
 
                     auto it = std::upper_bound(split_points_orig_.begin(), split_points_orig_.end(), points_begin + j);
-                    int rank = std::clamp<int>(static_cast<int>(std::distance(split_points_orig_.begin(), it)) - 1, 0, world_size_-1);
+                    int rank = std::clamp<int>(static_cast<int>(std::distance(split_points_orig_.begin(), it)) - 1, 0, comm_size_-1);
 
-                    if (rank != world_rank_) points_not_in_rank_thread[rank].insert(points_begin + j);
+                    if (rank != comm_rank_) points_not_in_rank_thread[rank].insert(points_begin + j);
 
                 }
 
@@ -1771,7 +1772,7 @@ class BoxTree
             #pragma omp critical
             {
             
-                for (int i = 0; i < world_size_; i++) {
+                for (int i = 0; i < comm_size_; i++) {
 
                     points_not_in_rank[i].insert(points_not_in_rank_thread[i].begin(), points_not_in_rank_thread[i].end());
 
@@ -1792,7 +1793,7 @@ class BoxTree
             #pragma omp parallel
             {
 
-            std::vector<std::unordered_set<long long>> points_not_in_rank_thread(world_size_);
+            std::vector<std::unordered_set<long long>> points_not_in_rank_thread(comm_size_);
             
             #pragma omp for
             for (long long i = 0; i < vec_mortonids.size(); i++) {
@@ -1813,9 +1814,9 @@ class BoxTree
                         for (long long j = 0; j < npoints; j++) {
 
                             auto it = std::upper_bound(split_points_orig_.begin(), split_points_orig_.end(), points_begin + j);
-                            int rank = std::clamp<int>(static_cast<int>(std::distance(split_points_orig_.begin(), it)) - 1, 0, world_size_-1);
+                            int rank = std::clamp<int>(static_cast<int>(std::distance(split_points_orig_.begin(), it)) - 1, 0, comm_size_-1);
     
-                            if (rank != world_rank_) points_not_in_rank_thread[rank].insert(points_begin + j);
+                            if (rank != comm_rank_) points_not_in_rank_thread[rank].insert(points_begin + j);
     
                         }
 
@@ -1828,7 +1829,7 @@ class BoxTree
             #pragma omp critical
             {
             
-                for (int i = 0; i < world_size_; i++) {
+                for (int i = 0; i < comm_size_; i++) {
 
                     points_not_in_rank[i].insert(points_not_in_rank_thread[i].begin(), points_not_in_rank_thread[i].end());
 
@@ -1850,7 +1851,7 @@ class BoxTree
             #pragma omp parallel
             {
 
-            std::vector<std::unordered_set<long long>> points_not_in_rank_thread(world_size_);
+            std::vector<std::unordered_set<long long>> points_not_in_rank_thread(comm_size_);
             long long old_morton_box = -1;
             
             #pragma omp for
@@ -1876,9 +1877,9 @@ class BoxTree
                         for (long long j = 0; j < npoints; j++) {
 
                             auto it = std::upper_bound(split_points_orig_.begin(), split_points_orig_.end(), points_begin + j);
-                            int rank = std::clamp<int>(static_cast<int>(std::distance(split_points_orig_.begin(), it)) - 1, 0, world_size_-1);
+                            int rank = std::clamp<int>(static_cast<int>(std::distance(split_points_orig_.begin(), it)) - 1, 0, comm_size_-1);
     
-                            if (rank != world_rank_) points_not_in_rank_thread[rank].insert(points_begin + j);
+                            if (rank != comm_rank_) points_not_in_rank_thread[rank].insert(points_begin + j);
     
                         }
 
@@ -1891,7 +1892,7 @@ class BoxTree
             #pragma omp critical
             {
             
-                for (int i = 0; i < world_size_; i++) {
+                for (int i = 0; i < comm_size_; i++) {
 
                     points_not_in_rank[i].insert(points_not_in_rank_thread[i].begin(), points_not_in_rank_thread[i].end());
 
@@ -1906,11 +1907,11 @@ class BoxTree
         void GetDataNotInRank(std::vector<std::unordered_set<long long>>& points_not_in_rank)
         {
 
-            std::vector<MPI_Count> send_counts_points(world_size_);
-            std::vector<MPI_Aint> sdispls_points(world_size_);
+            std::vector<MPI_Count> send_counts_points(comm_size_);
+            std::vector<MPI_Aint> sdispls_points(comm_size_);
             MPI_Count total_send_points = 0;    
 
-            for (int i = 0; i < world_size_; ++i) {
+            for (int i = 0; i < comm_size_; ++i) {
 
                 send_counts_points[i] = static_cast<MPI_Count>(points_not_in_rank[i].size());
                 sdispls_points[i] = total_send_points;
@@ -1922,7 +1923,7 @@ class BoxTree
             
             MPI_Aint current_point_pos = 0;
     
-            for (int i = 0; i < world_size_; ++i) {
+            for (int i = 0; i < comm_size_; ++i) {
 
                 std::copy(points_not_in_rank[i].begin(), points_not_in_rank[i].end(),
                           flat_send_points_buffer.begin() + current_point_pos);
@@ -1930,14 +1931,14 @@ class BoxTree
 
             }
 
-            std::vector<MPI_Count> recv_counts_points(world_size_);
+            std::vector<MPI_Count> recv_counts_points(comm_size_);
     
-            MPI_Alltoall(send_counts_points.data(), 1, MPI_COUNT, recv_counts_points.data(), 1, MPI_COUNT, MPI_COMM_WORLD);
+            MPI_Alltoall(send_counts_points.data(), 1, MPI_COUNT, recv_counts_points.data(), 1, MPI_COUNT, mpi_comm_);
 
-            std::vector<MPI_Aint> rdispls_points(world_size_);
+            std::vector<MPI_Aint> rdispls_points(comm_size_);
             MPI_Count total_recv_points = 0;
 
-            for (int i = 0; i < world_size_; ++i) {
+            for (int i = 0; i < comm_size_; ++i) {
 
                 rdispls_points[i] = total_recv_points;
                 total_recv_points += recv_counts_points[i];
@@ -1948,13 +1949,13 @@ class BoxTree
             
             MPI_Alltoallv_c(flat_send_points_buffer.data(), send_counts_points.data(), sdispls_points.data(), MPI_LONG_LONG,
                             flat_recv_points_buffer.data(), recv_counts_points.data(), rdispls_points.data(), MPI_LONG_LONG,
-                            MPI_COMM_WORLD);
+                            mpi_comm_);
 
-            std::vector<MPI_Count> send_counts_points_back(world_size_);
-            std::vector<MPI_Aint> sdispls_points_back(world_size_);
+            std::vector<MPI_Count> send_counts_points_back(comm_size_);
+            std::vector<MPI_Aint> sdispls_points_back(comm_size_);
             MPI_Count total_send_points_back = 0;
 
-            for (int i = 0; i < world_size_; ++i) {
+            for (int i = 0; i < comm_size_; ++i) {
 
                 send_counts_points_back[i] = recv_counts_points[i] * 7;
                 sdispls_points_back[i] = total_send_points_back;
@@ -1964,7 +1965,7 @@ class BoxTree
 
             std::vector<double> flat_send_points_back_buffer(static_cast<size_t>(total_send_points_back));
 
-            for (int sender_rank = 0; sender_rank < world_size_; ++sender_rank) {
+            for (int sender_rank = 0; sender_rank < comm_size_; ++sender_rank) {
         
                 MPI_Aint recv_pos = rdispls_points[sender_rank];
                 MPI_Aint out_pos = sdispls_points_back[sender_rank];
@@ -1989,15 +1990,15 @@ class BoxTree
 
             std::vector<long long>().swap(flat_recv_points_buffer);
 
-            std::vector<MPI_Count> recv_counts_points_back(world_size_);
+            std::vector<MPI_Count> recv_counts_points_back(comm_size_);
     
             MPI_Alltoall(send_counts_points_back.data(), 1, MPI_COUNT,
-                         recv_counts_points_back.data(), 1, MPI_COUNT, MPI_COMM_WORLD);
+                         recv_counts_points_back.data(), 1, MPI_COUNT, mpi_comm_);
 
             MPI_Count total_recv_points_back = 0;
-            std::vector<MPI_Aint> rdispls_points_back(world_size_);
+            std::vector<MPI_Aint> rdispls_points_back(comm_size_);
 
-            for (int i = 0; i < world_size_; ++i) {
+            for (int i = 0; i < comm_size_; ++i) {
 
                 rdispls_points_back[i] = total_recv_points_back;
                 total_recv_points_back += recv_counts_points_back[i];
@@ -2008,7 +2009,7 @@ class BoxTree
 
             MPI_Alltoallv_c(flat_send_points_back_buffer.data(), send_counts_points_back.data(), sdispls_points_back.data(), MPI_DOUBLE,
                             flat_recv_points_buffer_back.data(), recv_counts_points_back.data(), rdispls_points_back.data(), MPI_DOUBLE,
-                            MPI_COMM_WORLD);
+                            mpi_comm_);
     
             std::vector<double>().swap(flat_send_points_back_buffer);
 
@@ -2038,7 +2039,7 @@ class BoxTree
         void InitializePointsNotInRank() 
         {
 
-            std::vector<std::unordered_set<long long>> points_not_in_rank(world_size_);
+            std::vector<std::unordered_set<long long>> points_not_in_rank(comm_size_);
 
             InitializePointsLevelDNeighbours(points_not_in_rank);
 
@@ -2066,11 +2067,11 @@ class BoxTree
                                  std::unordered_map<long long, std::complex<double>>& density_not_in_rank)
         {           
 
-            std::vector<MPI_Count> send_counts_points(world_size_);
-            std::vector<MPI_Aint> sdispls_points(world_size_);
+            std::vector<MPI_Count> send_counts_points(comm_size_);
+            std::vector<MPI_Aint> sdispls_points(comm_size_);
             MPI_Count total_send_points = 0;    
 
-            for (int i = 0; i < world_size_; ++i) {
+            for (int i = 0; i < comm_size_; ++i) {
 
                 send_counts_points[i] = static_cast<MPI_Count>(points_not_in_rank_[i].size());
                 sdispls_points[i] = total_send_points;
@@ -2084,7 +2085,7 @@ class BoxTree
             
             MPI_Aint current_point_pos = 0;
     
-            for (int i = 0; i < world_size_; ++i) {
+            for (int i = 0; i < comm_size_; ++i) {
 
                 std::copy(points_not_in_rank_[i].begin(), points_not_in_rank_[i].end(),
                           flat_send_points_buffer.begin() + current_point_pos);
@@ -2092,14 +2093,14 @@ class BoxTree
 
             }
 
-            std::vector<MPI_Count> recv_counts_points(world_size_);
+            std::vector<MPI_Count> recv_counts_points(comm_size_);
     
-            MPI_Alltoall(send_counts_points.data(), 1, MPI_COUNT, recv_counts_points.data(), 1, MPI_COUNT, MPI_COMM_WORLD);
+            MPI_Alltoall(send_counts_points.data(), 1, MPI_COUNT, recv_counts_points.data(), 1, MPI_COUNT, mpi_comm_);
 
-            std::vector<MPI_Aint> rdispls_points(world_size_);
+            std::vector<MPI_Aint> rdispls_points(comm_size_);
             MPI_Count total_recv_points = 0;
 
-            for (int i = 0; i < world_size_; ++i) {
+            for (int i = 0; i < comm_size_; ++i) {
 
                 rdispls_points[i] = total_recv_points;
                 total_recv_points += recv_counts_points[i];
@@ -2110,13 +2111,13 @@ class BoxTree
             
             MPI_Alltoallv_c(flat_send_points_buffer.data(), send_counts_points.data(), sdispls_points.data(), MPI_LONG_LONG,
                             flat_recv_points_buffer.data(), recv_counts_points.data(), rdispls_points.data(), MPI_LONG_LONG,
-                            MPI_COMM_WORLD);
+                            mpi_comm_);
 
-            std::vector<MPI_Count> send_counts_points_back(world_size_);
-            std::vector<MPI_Aint> sdispls_points_back(world_size_);
+            std::vector<MPI_Count> send_counts_points_back(comm_size_);
+            std::vector<MPI_Aint> sdispls_points_back(comm_size_);
             MPI_Count total_send_points_back = 0;
 
-            for (int i = 0; i < world_size_; ++i) {
+            for (int i = 0; i < comm_size_; ++i) {
 
                 send_counts_points_back[i] = recv_counts_points[i];
                 sdispls_points_back[i] = total_send_points_back;
@@ -2126,7 +2127,7 @@ class BoxTree
 
             std::vector<std::complex<double>> flat_send_points_back_buffer(static_cast<size_t>(total_send_points_back));
 
-            for (int sender_rank = 0; sender_rank < world_size_; ++sender_rank) {
+            for (int sender_rank = 0; sender_rank < comm_size_; ++sender_rank) {
         
                 MPI_Aint recv_pos = rdispls_points[sender_rank];
                 MPI_Aint out_pos = sdispls_points_back[sender_rank];
@@ -2145,15 +2146,15 @@ class BoxTree
 
             std::vector<long long>().swap(flat_recv_points_buffer); 
 
-            std::vector<MPI_Count> recv_counts_points_back(world_size_);
+            std::vector<MPI_Count> recv_counts_points_back(comm_size_);
     
             MPI_Alltoall(send_counts_points_back.data(), 1, MPI_COUNT,
-                         recv_counts_points_back.data(), 1, MPI_COUNT, MPI_COMM_WORLD);
+                         recv_counts_points_back.data(), 1, MPI_COUNT, mpi_comm_);
 
             MPI_Count total_recv_points_back = 0;
-            std::vector<MPI_Aint> rdispls_points_back(world_size_);
+            std::vector<MPI_Aint> rdispls_points_back(comm_size_);
 
-            for (int i = 0; i < world_size_; ++i) {
+            for (int i = 0; i < comm_size_; ++i) {
 
                 rdispls_points_back[i] = total_recv_points_back;
                 total_recv_points_back += recv_counts_points_back[i];
@@ -2164,7 +2165,7 @@ class BoxTree
 
             MPI_Alltoallv_c(flat_send_points_back_buffer.data(), send_counts_points_back.data(), sdispls_points_back.data(), MPI_DOUBLE_COMPLEX,
                             flat_recv_points_buffer_back.data(), recv_counts_points_back.data(), rdispls_points_back.data(), MPI_DOUBLE_COMPLEX,
-                            MPI_COMM_WORLD);
+                            mpi_comm_);
     
             std::vector<std::complex<double>>().swap(flat_send_points_back_buffer);
 
@@ -2524,19 +2525,19 @@ class BoxTree
             std::complex<double>* buffer = conesegments_prev.data();
 
             MPI_Win win;
-            MPI_Win_create(buffer, N * sizeof(std::complex<double>), sizeof(std::complex<double>), MPI_INFO_NULL, MPI_COMM_WORLD, &win);
+            MPI_Win_create(buffer, N * sizeof(std::complex<double>), sizeof(std::complex<double>), MPI_INFO_NULL, mpi_comm_, &win);
 
             MPI_Win_lock_all(MPI_MODE_NOCHECK, win);
 
             coeffs.reserve(levels_[level]->flat_send_buffer_interpolation_.size());
 
             std::vector<MPI_Aint> displacements;
-            displacements.reserve(N / world_size_);
+            displacements.reserve(N / comm_size_);
 
             std::vector<std::complex<double>> recv_buffer;
-            recv_buffer.reserve((N / world_size_) * P_); 
+            recv_buffer.reserve((N / comm_size_) * P_); 
             
-            for (int rank = 0; rank < world_size_; rank++) {
+            for (int rank = 0; rank < comm_size_; rank++) {
 
                 long long start = levels_[level]->sdispls_interpolation_[rank];
                 long long size = levels_[level]->send_counts_interpolation_[rank];
@@ -2758,7 +2759,7 @@ class BoxTree
 
                         const std::complex<double>* vals_ptr = nullptr;
                     
-                        if ((relconesegment >= split_points[world_rank_]) && (relconesegment < split_points[world_rank_+1])) {
+                        if ((relconesegment >= split_points[comm_rank_]) && (relconesegment < split_points[comm_rank_+1])) {
                         
                             auto it = std::lower_bound(rel_conesegments.begin(), rel_conesegments.end(), relconesegment);
 
@@ -2811,19 +2812,19 @@ class BoxTree
             std::complex<double>* buffer = conesegments_current.data();
 
             MPI_Win win;
-            MPI_Win_create(buffer, N * sizeof(std::complex<double>), sizeof(std::complex<double>), MPI_INFO_NULL, MPI_COMM_WORLD, &win);
+            MPI_Win_create(buffer, N * sizeof(std::complex<double>), sizeof(std::complex<double>), MPI_INFO_NULL, mpi_comm_, &win);
 
             MPI_Win_lock_all(MPI_MODE_NOCHECK, win);
 
             coeffs.reserve(levels_[level]->flat_send_buffer_propagation_.size());
 
             std::vector<MPI_Aint> displacements;
-            displacements.reserve(N / world_size_);
+            displacements.reserve(N / comm_size_);
 
             std::vector<std::complex<double>> recv_buffer;
-            recv_buffer.reserve((N / world_size_) * P_); 
+            recv_buffer.reserve((N / comm_size_) * P_); 
             
-            for (int rank = 0; rank < world_size_; rank++) {
+            for (int rank = 0; rank < comm_size_; rank++) {
 
                 long long start = levels_[level]->sdispls_propagation_[rank];
                 long long size = levels_[level]->send_counts_propagation_[rank];
@@ -3035,7 +3036,7 @@ class BoxTree
 
                             const std::complex<double>* vals_ptr = nullptr;
                     
-                            if ((locrelconesegment >= split_points_2[world_rank_]) && (locrelconesegment < split_points_2[world_rank_+1])) {
+                            if ((locrelconesegment >= split_points_2[comm_rank_]) && (locrelconesegment < split_points_2[comm_rank_+1])) {
                             
                                 auto it = std::lower_bound(rel_conesegments_2.begin(), rel_conesegments_2.end(), locrelconesegment);
 
@@ -3109,7 +3110,7 @@ class BoxTree
                               const std::vector<MPI_Count>& recv_counts,
                               const std::vector<MPI_Aint>& displs,
                               double coupling_parameter, double WAVE_NUMBER, int EQUATION_FORMULATION,
-                              std::vector<long long>& sorting)
+                              std::vector<long long>& sorting, MPI_Comm mpi_comm)
         {
             
             x_ = std::vector<double>(x_begin, x_end);
@@ -3123,6 +3124,7 @@ class BoxTree
             nlevels_ = N_LEVELS_IFGF;
             wavenumber_ = WAVE_NUMBER;
             equation_formulation_ = EQUATION_FORMULATION;
+            mpi_comm_ = mpi_comm;
 
             split_points_orig_ = split_points;
             recv_counts_orig_  = recv_counts;
@@ -3181,14 +3183,14 @@ class BoxTree
 
             MPI_Count total_size_loc = morton_box_loc.size();
 
-            std::vector<MPI_Count> recv_counts(world_size_);
-            std::vector<MPI_Aint> displs(world_size_);
+            std::vector<MPI_Count> recv_counts(comm_size_);
+            std::vector<MPI_Aint> displs(comm_size_);
 
-            MPI_Allgather(&total_size_loc, 1, MPI_COUNT, &recv_counts[0], 1, MPI_COUNT, MPI_COMM_WORLD);
+            MPI_Allgather(&total_size_loc, 1, MPI_COUNT, &recv_counts[0], 1, MPI_COUNT, mpi_comm_);
 
             MPI_Count total_size = 0;
 
-            for (int i = 0; i < world_size_; i++) {
+            for (int i = 0; i < comm_size_; i++) {
 
                 displs[i] = total_size;
                 total_size += recv_counts[i];
@@ -3199,9 +3201,9 @@ class BoxTree
             std::vector<long long> position_all(static_cast<size_t>(total_size));
             std::vector<long long> size_all(static_cast<size_t>(total_size));
 
-            MPI_Allgatherv_c(&morton_box_loc[0], total_size_loc, MPI_LONG_LONG, &morton_box_all[0], &recv_counts[0], &displs[0], MPI_LONG_LONG, MPI_COMM_WORLD);
-            MPI_Allgatherv_c(&position_loc[0], total_size_loc, MPI_LONG_LONG, &position_all[0], &recv_counts[0], &displs[0], MPI_LONG_LONG, MPI_COMM_WORLD);
-            MPI_Allgatherv_c(&size_loc[0], total_size_loc, MPI_LONG_LONG, &size_all[0], &recv_counts[0], &displs[0], MPI_LONG_LONG, MPI_COMM_WORLD);
+            MPI_Allgatherv_c(&morton_box_loc[0], total_size_loc, MPI_LONG_LONG, &morton_box_all[0], &recv_counts[0], &displs[0], MPI_LONG_LONG, mpi_comm_);
+            MPI_Allgatherv_c(&position_loc[0], total_size_loc, MPI_LONG_LONG, &position_all[0], &recv_counts[0], &displs[0], MPI_LONG_LONG, mpi_comm_);
+            MPI_Allgatherv_c(&size_loc[0], total_size_loc, MPI_LONG_LONG, &size_all[0], &recv_counts[0], &displs[0], MPI_LONG_LONG, mpi_comm_);
 
             std::vector<long long>().swap(morton_box_loc);
             std::vector<long long>().swap(position_loc);

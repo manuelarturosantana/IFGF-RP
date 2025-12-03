@@ -74,8 +74,8 @@ class Solver
         std::vector<std::complex<double>> Tn_;
         std::vector<std::complex<double>> Tm_;
 
-        int world_rank_;
-        int world_size_;
+        int comm_rank_;
+        int comm_size_;
 
         MPI_Comm mpi_comm_;
 
@@ -379,7 +379,7 @@ class Solver
         const MPI_Comm& mpi_comm);
 
         void init_solver(const bool timing, 
-            const double k);
+            const double k, MPI_Comm mpi_comm);
 
 
 

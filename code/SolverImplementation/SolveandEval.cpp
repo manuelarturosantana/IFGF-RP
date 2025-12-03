@@ -84,7 +84,7 @@ void Solver::compute_phi_not_in_rank(const std::complex<double>* phi, std::unord
     std::vector<std::complex<double>>>& phi_not_in_rank)
  {
 
-    std::vector<std::vector<long long>> patches_not_in_rank(world_size_);
+    std::vector<std::vector<long long>> patches_not_in_rank(comm_size_);
 
     for (long long patch_num : patch_num_coeffs_) {
 
@@ -93,9 +93,9 @@ void Solver::compute_phi_not_in_rank(const std::complex<double>* phi, std::unord
         int rank = static_cast<int>(std::distance(split_points_.begin(), it)) - 1;
 
         if (rank < 0) rank = 0;                
-        if (rank >= world_size_) rank = world_size_ - 1; 
+        if (rank >= comm_size_) rank = comm_size_ - 1; 
 
-        if (world_rank_ != rank) {
+        if (comm_rank_ != rank) {
 
             patches_not_in_rank[rank].push_back(patch_num);
 
@@ -103,11 +103,11 @@ void Solver::compute_phi_not_in_rank(const std::complex<double>* phi, std::unord
 
     }
 
-    std::vector<MPI_Count> send_counts_patches(world_size_);
-    std::vector<MPI_Aint> sdispls_patches(world_size_);
+    std::vector<MPI_Count> send_counts_patches(comm_size_);
+    std::vector<MPI_Aint> sdispls_patches(comm_size_);
     MPI_Count total_send_patches = 0;    
 
-    for (int i = 0; i < world_size_; ++i) {
+    for (int i = 0; i < comm_size_; ++i) {
 
         send_counts_patches[i] = static_cast<MPI_Count>(patches_not_in_rank[i].size());
         sdispls_patches[i] = total_send_patches;
@@ -119,7 +119,7 @@ void Solver::compute_phi_not_in_rank(const std::complex<double>* phi, std::unord
 
     MPI_Aint current_patch_pos = 0;
 
-    for (int i = 0; i < world_size_; ++i) {
+    for (int i = 0; i < comm_size_; ++i) {
 
         std::copy(patches_not_in_rank[i].begin(), patches_not_in_rank[i].end(),
                     flat_send_patches_buffer.begin() + current_patch_pos);
@@ -129,14 +129,14 @@ void Solver::compute_phi_not_in_rank(const std::complex<double>* phi, std::unord
     
     patches_not_in_rank.clear();
 
-    std::vector<MPI_Count> recv_counts_patches(world_size_);
+    std::vector<MPI_Count> recv_counts_patches(comm_size_);
 
-    MPI_Alltoall(send_counts_patches.data(), 1, MPI_COUNT, recv_counts_patches.data(), 1, MPI_COUNT, MPI_COMM_WORLD);
+    MPI_Alltoall(send_counts_patches.data(), 1, MPI_COUNT, recv_counts_patches.data(), 1, MPI_COUNT, mpi_comm_);
 
-    std::vector<MPI_Aint> rdispls_patches(world_size_);
+    std::vector<MPI_Aint> rdispls_patches(comm_size_);
     MPI_Count total_recv_patches = 0;
 
-    for (int i = 0; i < world_size_; ++i) {
+    for (int i = 0; i < comm_size_; ++i) {
 
         rdispls_patches[i] = total_recv_patches;
         total_recv_patches += recv_counts_patches[i];
@@ -148,18 +148,18 @@ void Solver::compute_phi_not_in_rank(const std::complex<double>* phi, std::unord
     MPI_Request request_patches;
     MPI_Ialltoallv_c(flat_send_patches_buffer.data(), send_counts_patches.data(), sdispls_patches.data(), MPI_LONG_LONG,
                         flat_recv_patches_buffer.data(), recv_counts_patches.data(), rdispls_patches.data(), MPI_LONG_LONG,
-                        MPI_COMM_WORLD, &request_patches);
+                        mpi_comm_, &request_patches);
 
     const size_t patch_data_size = Nu_int_ * Nv_int_; 
     MPI_Count total_send_data_back = total_recv_patches * static_cast<MPI_Count>(patch_data_size);
 
     std::vector<std::complex<double>> flat_send_data_back_buffer(static_cast<size_t>(total_send_data_back));
 
-    std::vector<MPI_Count> send_counts_data_back(world_size_);
-    std::vector<MPI_Aint> sdispls_data_back(world_size_);
+    std::vector<MPI_Count> send_counts_data_back(comm_size_);
+    std::vector<MPI_Aint> sdispls_data_back(comm_size_);
     MPI_Aint current_data_pos = 0;
 
-    for (int sender_rank = 0; sender_rank < world_size_; ++sender_rank) {
+    for (int sender_rank = 0; sender_rank < comm_size_; ++sender_rank) {
 
         MPI_Count num_patches = recv_counts_patches[sender_rank];
         MPI_Count data_size = num_patches * static_cast<MPI_Count>(patch_data_size);
@@ -174,7 +174,7 @@ void Solver::compute_phi_not_in_rank(const std::complex<double>* phi, std::unord
 
     MPI_Aint current_patch_idx = 0;
 
-    for (int sender_rank = 0; sender_rank < world_size_; ++sender_rank) {
+    for (int sender_rank = 0; sender_rank < comm_size_; ++sender_rank) {
 
         MPI_Count num_patches_from_this_sender = recv_counts_patches[sender_rank];
 
@@ -200,15 +200,15 @@ void Solver::compute_phi_not_in_rank(const std::complex<double>* phi, std::unord
 
     flat_recv_patches_buffer.clear(); 
 
-    std::vector<MPI_Count> recv_counts_data_back(world_size_);
+    std::vector<MPI_Count> recv_counts_data_back(comm_size_);
 
     MPI_Alltoall(send_counts_data_back.data(), 1, MPI_COUNT,
-                    recv_counts_data_back.data(), 1, MPI_COUNT, MPI_COMM_WORLD);
+                    recv_counts_data_back.data(), 1, MPI_COUNT, mpi_comm_);
 
     MPI_Count total_recv_data_back = 0;
-    std::vector<MPI_Aint> rdispls_data_back(world_size_);
+    std::vector<MPI_Aint> rdispls_data_back(comm_size_);
 
-    for (int i = 0; i < world_size_; ++i) {
+    for (int i = 0; i < comm_size_; ++i) {
 
         rdispls_data_back[i] = total_recv_data_back;
         total_recv_data_back += recv_counts_data_back[i];
@@ -220,7 +220,7 @@ void Solver::compute_phi_not_in_rank(const std::complex<double>* phi, std::unord
     MPI_Request request_data;
     MPI_Ialltoallv_c(flat_send_data_back_buffer.data(), send_counts_data_back.data(), sdispls_data_back.data(), MPI_DOUBLE_COMPLEX,
                         flat_recv_data_buffer_back.data(), recv_counts_data_back.data(), rdispls_data_back.data(), MPI_DOUBLE_COMPLEX,
-                        MPI_COMM_WORLD, &request_data); 
+                        mpi_comm_, &request_data); 
 
     flat_send_data_back_buffer.clear();
 
@@ -480,7 +480,7 @@ std::complex<double> Solver::compute_incident_field(double x, double y, double z
 std::vector<std::complex<double>> Solver::solve_u_inc(bool timing) 
 {
     
-    MPI_Barrier(MPI_COMM_WORLD);
+    MPI_Barrier(mpi_comm_);
 
     double start_1 = MPI_Wtime();
 
@@ -488,14 +488,14 @@ std::vector<std::complex<double>> Solver::solve_u_inc(bool timing)
 
     double end_1 = MPI_Wtime();
 
-    if (timing && world_rank_ == 0) {
+    if (timing && comm_rank_ == 0) {
 
         std::cout << "Time compute incident field: " << end_1 - start_1 << " seconds\n";
         print_max_RSS();
 
     }
 
-    MPI_Barrier(MPI_COMM_WORLD);
+    MPI_Barrier(mpi_comm_);
 
     double start_2 = MPI_Wtime();
 
@@ -507,14 +507,14 @@ std::vector<std::complex<double>> Solver::solve_u_inc(bool timing)
 
     double end_2 = MPI_Wtime();
 
-    if (timing && world_rank_ == 0) {
+    if (timing && comm_rank_ == 0) {
 
         std::cout << "Time solve: " << end_2 - start_2 << " seconds\n";
         print_max_RSS();
 
     }
 
-    MPI_Barrier(MPI_COMM_WORLD);
+    MPI_Barrier(mpi_comm_);
 
     return solution;
 
@@ -683,7 +683,7 @@ std::complex<double> Solver::compute_far_field_exact(const double xVers_0, const
 void Solver::compute_far_field_error(const bool timing, const std::vector<std::complex<double>>& phi)
 {           
 
-    MPI_Barrier(MPI_COMM_WORLD);
+    MPI_Barrier(mpi_comm_);
     double start = MPI_Wtime();
 
     const double deltaPhi = (M_PI - 2.0 * 1.0e-5) / (N_FAR_PTS[0] - 1);
@@ -691,14 +691,14 @@ void Solver::compute_far_field_error(const bool timing, const std::vector<std::c
 
     const long long total_pts = N_FAR_PTS[0] * N_FAR_PTS[1];
 
-    std::vector<long long> split_points_far_field(world_size_ + 1);
-    const long long points_per_rank = total_pts / world_size_;
-    long long remaining_points = total_pts % world_size_;
+    std::vector<long long> split_points_far_field(comm_size_ + 1);
+    const long long points_per_rank = total_pts / comm_size_;
+    long long remaining_points = total_pts % comm_size_;
 
     split_points_far_field[0] = 0;
-    split_points_far_field[world_size_] = total_pts;
+    split_points_far_field[comm_size_] = total_pts;
 
-    for (int i = 1; i < world_size_; i++) {
+    for (int i = 1; i < comm_size_; i++) {
 
         split_points_far_field[i] = split_points_far_field[i-1] + points_per_rank;
 
@@ -711,10 +711,10 @@ void Solver::compute_far_field_error(const bool timing, const std::vector<std::c
 
     }
 
-    std::vector<int> recv_counts_far_field(world_size_);
-    std::vector<int> displs_far_field(world_size_, 0);
+    std::vector<int> recv_counts_far_field(comm_size_);
+    std::vector<int> displs_far_field(comm_size_, 0);
 
-    for (int i = 0; i < world_size_; i++) {
+    for (int i = 0; i < comm_size_; i++) {
 
         recv_counts_far_field[i] = split_points_far_field[i+1] - split_points_far_field[i];
 
@@ -726,8 +726,8 @@ void Solver::compute_far_field_error(const bool timing, const std::vector<std::c
 
     }
 
-    long long point_low_far_field = split_points_far_field[world_rank_];
-    long long point_up_far_field = split_points_far_field[world_rank_+1];
+    long long point_low_far_field = split_points_far_field[comm_rank_];
+    long long point_up_far_field = split_points_far_field[comm_rank_+1];
 
     std::vector<double> xVers_0_loc(point_up_far_field-point_low_far_field);
     std::vector<double> xVers_1_loc(point_up_far_field-point_low_far_field);
@@ -756,9 +756,9 @@ void Solver::compute_far_field_error(const bool timing, const std::vector<std::c
     std::vector<double> xVers_1_all(total_pts);
     std::vector<double> xVers_2_all(total_pts);
 
-    MPI_Allgatherv(&xVers_0_loc[0], point_up_far_field-point_low_far_field, MPI_DOUBLE, &xVers_0_all[0], &recv_counts_far_field[0], &displs_far_field[0], MPI_DOUBLE, MPI_COMM_WORLD);
-    MPI_Allgatherv(&xVers_1_loc[0], point_up_far_field-point_low_far_field, MPI_DOUBLE, &xVers_1_all[0], &recv_counts_far_field[0], &displs_far_field[0], MPI_DOUBLE, MPI_COMM_WORLD);
-    MPI_Allgatherv(&xVers_2_loc[0], point_up_far_field-point_low_far_field, MPI_DOUBLE, &xVers_2_all[0], &recv_counts_far_field[0], &displs_far_field[0], MPI_DOUBLE, MPI_COMM_WORLD);
+    MPI_Allgatherv(&xVers_0_loc[0], point_up_far_field-point_low_far_field, MPI_DOUBLE, &xVers_0_all[0], &recv_counts_far_field[0], &displs_far_field[0], MPI_DOUBLE, mpi_comm_);
+    MPI_Allgatherv(&xVers_1_loc[0], point_up_far_field-point_low_far_field, MPI_DOUBLE, &xVers_1_all[0], &recv_counts_far_field[0], &displs_far_field[0], MPI_DOUBLE, mpi_comm_);
+    MPI_Allgatherv(&xVers_2_loc[0], point_up_far_field-point_low_far_field, MPI_DOUBLE, &xVers_2_all[0], &recv_counts_far_field[0], &displs_far_field[0], MPI_DOUBLE, mpi_comm_);
 
     std::vector<double>().swap(xVers_0_loc);
     std::vector<double>().swap(xVers_1_loc);
@@ -775,7 +775,7 @@ void Solver::compute_far_field_error(const bool timing, const std::vector<std::c
 
     std::vector<std::complex<double>> far_field_approx_all(total_pts);
 
-    MPI_Allreduce(&far_field_approx_loc[0], &far_field_approx_all[0], total_pts, MPI_DOUBLE_COMPLEX, MPI_SUM, MPI_COMM_WORLD);
+    MPI_Allreduce(&far_field_approx_loc[0], &far_field_approx_all[0], total_pts, MPI_DOUBLE_COMPLEX, MPI_SUM, mpi_comm_);
 
     std::vector<std::complex<double>>().swap(far_field_approx_loc);
 
@@ -801,13 +801,13 @@ void Solver::compute_far_field_error(const bool timing, const std::vector<std::c
     double error_1;
     double error_2;
 
-    MPI_Allreduce(&error_1_loc, &error_1, 1, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD);
-    MPI_Allreduce(&error_2_loc, &error_2, 1, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD);
+    MPI_Allreduce(&error_1_loc, &error_1, 1, MPI_DOUBLE, MPI_MAX, mpi_comm_);
+    MPI_Allreduce(&error_2_loc, &error_2, 1, MPI_DOUBLE, MPI_MAX, mpi_comm_);
 
     double end = MPI_Wtime();
-    MPI_Barrier(MPI_COMM_WORLD);
+    MPI_Barrier(mpi_comm_);
 
-    if (world_rank_ == 0) {
+    if (comm_rank_ == 0) {
 
         if (timing) {
 
@@ -829,7 +829,7 @@ void Solver::compute_near_field(const bool timing, const std::vector<std::comple
 
     for (int i = 0; i < nNearZones; i++) {
 
-        MPI_Barrier(MPI_COMM_WORLD);
+        MPI_Barrier(mpi_comm_);
         double start = MPI_Wtime();
 
         const double xmin = NEAR_FIELD_LIMITS[i][0];
@@ -853,14 +853,14 @@ void Solver::compute_near_field(const bool timing, const std::vector<std::comple
 
         const long long total_pts = imax * jmax * kmax;
 
-        std::vector<long long> split_points_near_field(world_size_ + 1);
-        const long long points_per_rank = total_pts / world_size_;
-        long long remaining_points = total_pts % world_size_;
+        std::vector<long long> split_points_near_field(comm_size_ + 1);
+        const long long points_per_rank = total_pts / comm_size_;
+        long long remaining_points = total_pts % comm_size_;
 
         split_points_near_field[0] = 0;
-        split_points_near_field[world_size_] = total_pts;
+        split_points_near_field[comm_size_] = total_pts;
 
-        for (int l = 1; l < world_size_; l++) {
+        for (int l = 1; l < comm_size_; l++) {
 
             split_points_near_field[l] = split_points_near_field[l-1] + points_per_rank;
 
@@ -873,10 +873,10 @@ void Solver::compute_near_field(const bool timing, const std::vector<std::comple
 
         }
 
-        std::vector<int> recv_counts_near_field(world_size_);
-        std::vector<int> displs_near_field(world_size_, 0);
+        std::vector<int> recv_counts_near_field(comm_size_);
+        std::vector<int> displs_near_field(comm_size_, 0);
 
-        for (int l = 0; l < world_size_; l++) {
+        for (int l = 0; l < comm_size_; l++) {
 
             recv_counts_near_field[l] = split_points_near_field[l+1] - split_points_near_field[l];
 
@@ -888,8 +888,8 @@ void Solver::compute_near_field(const bool timing, const std::vector<std::comple
 
         }
 
-        long long point_low_near_field = split_points_near_field[world_rank_];
-        long long point_up_near_field = split_points_near_field[world_rank_+1];
+        long long point_low_near_field = split_points_near_field[comm_rank_];
+        long long point_up_near_field = split_points_near_field[comm_rank_+1];
 
         std::vector<double> x_loc(point_up_near_field-point_low_near_field);
         std::vector<double> y_loc(point_up_near_field-point_low_near_field);
@@ -912,9 +912,9 @@ void Solver::compute_near_field(const bool timing, const std::vector<std::comple
         std::vector<double> y_all(total_pts);
         std::vector<double> z_all(total_pts);
         
-        MPI_Allgatherv(&x_loc[0], point_up_near_field-point_low_near_field, MPI_DOUBLE, &x_all[0], &recv_counts_near_field[0], &displs_near_field[0], MPI_DOUBLE, MPI_COMM_WORLD);
-        MPI_Allgatherv(&y_loc[0], point_up_near_field-point_low_near_field, MPI_DOUBLE, &y_all[0], &recv_counts_near_field[0], &displs_near_field[0], MPI_DOUBLE, MPI_COMM_WORLD);
-        MPI_Allgatherv(&z_loc[0], point_up_near_field-point_low_near_field, MPI_DOUBLE, &z_all[0], &recv_counts_near_field[0], &displs_near_field[0], MPI_DOUBLE, MPI_COMM_WORLD);
+        MPI_Allgatherv(&x_loc[0], point_up_near_field-point_low_near_field, MPI_DOUBLE, &x_all[0], &recv_counts_near_field[0], &displs_near_field[0], MPI_DOUBLE, mpi_comm_);
+        MPI_Allgatherv(&y_loc[0], point_up_near_field-point_low_near_field, MPI_DOUBLE, &y_all[0], &recv_counts_near_field[0], &displs_near_field[0], MPI_DOUBLE, mpi_comm_);
+        MPI_Allgatherv(&z_loc[0], point_up_near_field-point_low_near_field, MPI_DOUBLE, &z_all[0], &recv_counts_near_field[0], &displs_near_field[0], MPI_DOUBLE, mpi_comm_);
 
         std::vector<double>().swap(x_loc);
         std::vector<double>().swap(y_loc);
@@ -939,18 +939,18 @@ void Solver::compute_near_field(const bool timing, const std::vector<std::comple
         std::vector<std::complex<double>> u_scat_all(total_pts);
         std::vector<std::complex<double>> u_total_all(total_pts);
 
-        MPI_Allreduce(&u_inc_loc[0], &u_inc_all[0], total_pts, MPI_DOUBLE_COMPLEX, MPI_SUM, MPI_COMM_WORLD);
-        MPI_Allreduce(&u_scat_loc[0], &u_scat_all[0], total_pts, MPI_DOUBLE_COMPLEX, MPI_SUM, MPI_COMM_WORLD);
-        MPI_Allreduce(&u_total_loc[0], &u_total_all[0], total_pts, MPI_DOUBLE_COMPLEX, MPI_SUM, MPI_COMM_WORLD);
+        MPI_Allreduce(&u_inc_loc[0], &u_inc_all[0], total_pts, MPI_DOUBLE_COMPLEX, MPI_SUM, mpi_comm_);
+        MPI_Allreduce(&u_scat_loc[0], &u_scat_all[0], total_pts, MPI_DOUBLE_COMPLEX, MPI_SUM, mpi_comm_);
+        MPI_Allreduce(&u_total_loc[0], &u_total_all[0], total_pts, MPI_DOUBLE_COMPLEX, MPI_SUM, mpi_comm_);
 
         std::vector<std::complex<double>>().swap(u_inc_loc);
         std::vector<std::complex<double>>().swap(u_scat_loc);
         std::vector<std::complex<double>>().swap(u_total_loc);
 
         double end = MPI_Wtime();
-        MPI_Barrier(MPI_COMM_WORLD);
+        MPI_Barrier(mpi_comm_);
 
-        if (world_rank_ == 0 && timing) {
+        if (comm_rank_ == 0 && timing) {
 
             std::cout << "Time compute near field: " << end - start << " seconds\n";
             print_max_RSS();
@@ -959,7 +959,7 @@ void Solver::compute_near_field(const bool timing, const std::vector<std::comple
 
         std::ofstream file_i_u_inc, file_i_u_scat, file_i_u_total;
 
-        if (world_rank_ == 0) {
+        if (comm_rank_ == 0) {
 
             file_i_u_inc.open("u_inc_" + std::to_string(i) + ".txt");
             file_i_u_scat.open("u_scat_" + std::to_string(i) + ".txt");

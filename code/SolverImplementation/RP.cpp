@@ -692,7 +692,7 @@ void Solver::compute_intensities(const std::complex<double>* phi,
 
     int max_threads = omp_get_max_threads();
 
-    std::vector<std::vector<MPI_Count>> thread_counts(max_threads, std::vector<MPI_Count>(world_size_, 0));
+    std::vector<std::vector<MPI_Count>> thread_counts(max_threads, std::vector<MPI_Count>(comm_size_, 0));
 
     #pragma omp parallel
     {
@@ -715,7 +715,7 @@ void Solver::compute_intensities(const std::complex<double>* phi,
             int rank = static_cast<int>(std::distance(split_points_2_.begin(), it)) - 1;
         
             if (rank < 0) rank = 0;
-            if (rank >= world_size_) rank = world_size_ - 1;
+            if (rank >= comm_size_) rank = comm_size_ - 1;
                 
             my_counts[rank]++;
 
@@ -725,13 +725,13 @@ void Solver::compute_intensities(const std::complex<double>* phi,
 
     }
 
-    std::vector<MPI_Count> global_send_counts(world_size_, 0);
-    std::vector<MPI_Aint> sdispls(world_size_);
-    std::vector<std::vector<MPI_Aint>> thread_offsets(max_threads, std::vector<MPI_Aint>(world_size_));
+    std::vector<MPI_Count> global_send_counts(comm_size_, 0);
+    std::vector<MPI_Aint> sdispls(comm_size_);
+    std::vector<std::vector<MPI_Aint>> thread_offsets(max_threads, std::vector<MPI_Aint>(comm_size_));
 
     MPI_Count total_send_points = 0;
 
-    for (int r = 0; r < world_size_; r++) {
+    for (int r = 0; r < comm_size_; r++) {
     
         sdispls[r] = total_send_points;
     
@@ -745,8 +745,8 @@ void Solver::compute_intensities(const std::complex<double>* phi,
     
     }
 
-    MPI_Count local_count = global_send_counts[world_rank_];
-    global_send_counts[world_rank_] = 0;
+    MPI_Count local_count = global_send_counts[comm_rank_];
+    global_send_counts[comm_rank_] = 0;
 
     std::vector<long long> flat_send_points(total_send_points);
     std::vector<std::complex<double>> flat_send_data(total_send_points);
@@ -784,9 +784,9 @@ void Solver::compute_intensities(const std::complex<double>* phi,
             auto it = std::upper_bound(split_points_2_.begin(), split_points_2_.end(), point);
             int rank = static_cast<int>(std::distance(split_points_2_.begin(), it)) - 1;
             if (rank < 0) rank = 0;
-            if (rank >= world_size_) rank = world_size_ - 1;
+            if (rank >= comm_size_) rank = comm_size_ - 1;
                 
-            if (rank == world_rank_) {
+            if (rank == comm_rank_) {
 
                 intensities_ptr[point - point_low_] = val;
 
@@ -804,13 +804,13 @@ void Solver::compute_intensities(const std::complex<double>* phi,
     
     }
 
-    std::vector<MPI_Count> recv_counts(world_size_);
-    MPI_Alltoall(global_send_counts.data(), 1, MPI_COUNT, recv_counts.data(), 1, MPI_COUNT, MPI_COMM_WORLD);
+    std::vector<MPI_Count> recv_counts(comm_size_);
+    MPI_Alltoall(global_send_counts.data(), 1, MPI_COUNT, recv_counts.data(), 1, MPI_COUNT, mpi_comm_);
 
-    std::vector<MPI_Aint> rdispls(world_size_);
+    std::vector<MPI_Aint> rdispls(comm_size_);
     MPI_Count total_recv_points = 0;
 
-    for (int i = 0; i < world_size_; ++i) {
+    for (int i = 0; i < comm_size_; ++i) {
 
         rdispls[i] = total_recv_points;
         total_recv_points += recv_counts[i];
@@ -822,12 +822,12 @@ void Solver::compute_intensities(const std::complex<double>* phi,
 
     MPI_Alltoallv_c(flat_send_points.data(), global_send_counts.data(), sdispls.data(), MPI_LONG_LONG,
                     flat_recv_points.data(), recv_counts.data(), rdispls.data(), MPI_LONG_LONG,
-                    MPI_COMM_WORLD);
+                    mpi_comm_);
     std::vector<long long>().swap(flat_send_points);
 
     MPI_Alltoallv_c(flat_send_data.data(), global_send_counts.data(), sdispls.data(), MPI_DOUBLE_COMPLEX,
                     flat_recv_data.data(), recv_counts.data(), rdispls.data(), MPI_DOUBLE_COMPLEX,
-                    MPI_COMM_WORLD);
+                    mpi_comm_);
     std::vector<std::complex<double>>().swap(flat_send_data);
 
     long long* recv_pts_ptr = flat_recv_points.data();
@@ -846,8 +846,8 @@ void Solver::redistribute_data_RP(const std::vector<std::complex<double>>& inten
                                     std::complex<double>* rhs)
 {
 
-    std::vector<std::vector<long long>> points_not_in_rank(world_size_);
-    std::vector<std::vector<std::complex<double>>> intensities_not_in_rank(world_size_);
+    std::vector<std::vector<long long>> points_not_in_rank(comm_size_);
+    std::vector<std::vector<std::complex<double>>> intensities_not_in_rank(comm_size_);
 
     for (long long i = 0; i < point_up_ - point_low_; i++) {
 
@@ -855,9 +855,9 @@ void Solver::redistribute_data_RP(const std::vector<std::complex<double>>& inten
 
         auto it = std::upper_bound(split_points_2_.begin(), split_points_2_.end(), point);
 
-        int rank = std::clamp<int>(static_cast<int>(std::distance(split_points_2_.begin(), it)) - 1, 0, world_size_-1);
+        int rank = std::clamp<int>(static_cast<int>(std::distance(split_points_2_.begin(), it)) - 1, 0, comm_size_-1);
 
-        if (world_rank_ == rank) {
+        if (comm_rank_ == rank) {
 
             rhs[point - point_low_] += intensities[i];
 
@@ -870,11 +870,11 @@ void Solver::redistribute_data_RP(const std::vector<std::complex<double>>& inten
 
     }
 
-    std::vector<MPI_Count> send_counts_points(world_size_);
-    std::vector<MPI_Aint> sdispls_points(world_size_);
+    std::vector<MPI_Count> send_counts_points(comm_size_);
+    std::vector<MPI_Aint> sdispls_points(comm_size_);
     MPI_Count total_send_points = 0;    
 
-    for (int i = 0; i < world_size_; ++i) {
+    for (int i = 0; i < comm_size_; ++i) {
 
         send_counts_points[i] = static_cast<MPI_Count>(points_not_in_rank[i].size());
         sdispls_points[i] = total_send_points;
@@ -887,7 +887,7 @@ void Solver::redistribute_data_RP(const std::vector<std::complex<double>>& inten
     
     MPI_Aint current_point_pos = 0;
 
-    for (int i = 0; i < world_size_; ++i) {
+    for (int i = 0; i < comm_size_; ++i) {
 
         std::copy(points_not_in_rank[i].begin(), points_not_in_rank[i].end(),
                     flat_send_points_buffer.begin() + current_point_pos);
@@ -900,14 +900,14 @@ void Solver::redistribute_data_RP(const std::vector<std::complex<double>>& inten
     points_not_in_rank.clear();
     intensities_not_in_rank.clear();
 
-    std::vector<MPI_Count> recv_counts_points(world_size_);
+    std::vector<MPI_Count> recv_counts_points(comm_size_);
 
-    MPI_Alltoall(send_counts_points.data(), 1, MPI_COUNT, recv_counts_points.data(), 1, MPI_COUNT, MPI_COMM_WORLD);
+    MPI_Alltoall(send_counts_points.data(), 1, MPI_COUNT, recv_counts_points.data(), 1, MPI_COUNT, mpi_comm_);
 
-    std::vector<MPI_Aint> rdispls_points(world_size_);
+    std::vector<MPI_Aint> rdispls_points(comm_size_);
     MPI_Count total_recv_points = 0;
 
-    for (int i = 0; i < world_size_; ++i) {
+    for (int i = 0; i < comm_size_; ++i) {
 
         rdispls_points[i] = total_recv_points;
         total_recv_points += recv_counts_points[i];
@@ -919,11 +919,11 @@ void Solver::redistribute_data_RP(const std::vector<std::complex<double>>& inten
     
     MPI_Alltoallv_c(flat_send_points_buffer.data(), send_counts_points.data(), sdispls_points.data(), MPI_LONG_LONG,
                     flat_recv_points_buffer.data(), recv_counts_points.data(), rdispls_points.data(), MPI_LONG_LONG,
-                    MPI_COMM_WORLD);
+                    mpi_comm_);
 
     MPI_Alltoallv_c(flat_send_intensities_buffer.data(), send_counts_points.data(), sdispls_points.data(), MPI_DOUBLE_COMPLEX,
                     flat_recv_intensities_buffer.data(), recv_counts_points.data(), rdispls_points.data(), MPI_DOUBLE_COMPLEX,
-                    MPI_COMM_WORLD);
+                    mpi_comm_);
 
     std::vector<long long>().swap(flat_send_points_buffer);
     std::vector<std::complex<double>>().swap(flat_send_intensities_buffer);

@@ -14,22 +14,22 @@ void Solver::compute_parallel_parameters()
         throw std::logic_error("Cannot use this code without MPI initialization\n");
     }
 
-    MPI_Comm_size(MPI_COMM_WORLD, &world_size_);
-    MPI_Comm_rank(MPI_COMM_WORLD, &world_rank_);
+    MPI_Comm_size(MPI_COMM_WORLD, &comm_size_);
+    MPI_Comm_rank(MPI_COMM_WORLD, &comm_rank_);
 
-    split_points_ = std::vector<long long>(world_size_ + 1);
-    split_points_2_ = std::vector<long long>(world_size_ + 1);
+    split_points_ = std::vector<long long>(comm_size_ + 1);
+    split_points_2_ = std::vector<long long>(comm_size_ + 1);
 
-    const long long patches_per_rank = (Q_ * Qx_*Qy_) / world_size_;
-    long long remaining_patches = (Q_ * Qx_*Qy_) % world_size_;
+    const long long patches_per_rank = (Q_ * Qx_*Qy_) / comm_size_;
+    long long remaining_patches = (Q_ * Qx_*Qy_) % comm_size_;
 
     split_points_[0] = 0;
-    split_points_[world_size_] = Q_ * Qx_*Qy_;
+    split_points_[comm_size_] = Q_ * Qx_*Qy_;
 
     split_points_2_[0] = 0;
-    split_points_2_[world_size_] = Q_ * Qx_*Qy_ * Nu_int_*Nv_int_;
+    split_points_2_[comm_size_] = Q_ * Qx_*Qy_ * Nu_int_*Nv_int_;
 
-    for (int i = 1; i < world_size_; i++) {
+    for (int i = 1; i < comm_size_; i++) {
 
         split_points_[i] = split_points_[i-1] + patches_per_rank;
 
@@ -42,13 +42,13 @@ void Solver::compute_parallel_parameters()
 
     }
 
-    recv_counts_ = std::vector<MPI_Count>(world_size_);
-    displs_ = std::vector<MPI_Aint>(world_size_, 0);
+    recv_counts_ = std::vector<MPI_Count>(comm_size_);
+    displs_ = std::vector<MPI_Aint>(comm_size_, 0);
 
-    recv_counts_2_ = std::vector<MPI_Count>(world_size_);
-    displs_2_ = std::vector<MPI_Aint>(world_size_, 0);
+    recv_counts_2_ = std::vector<MPI_Count>(comm_size_);
+    displs_2_ = std::vector<MPI_Aint>(comm_size_, 0);
 
-    for (int rank = 0; rank < world_size_; rank++) {
+    for (int rank = 0; rank < comm_size_; rank++) {
 
         recv_counts_[rank] = split_points_[rank + 1] - split_points_[rank];
         recv_counts_2_[rank] = split_points_2_[rank + 1] - split_points_2_[rank];
@@ -62,8 +62,8 @@ void Solver::compute_parallel_parameters()
 
     }
 
-    patch_low_ = split_points_[world_rank_];
-    patch_up_ = split_points_[world_rank_ + 1];
+    patch_low_ = split_points_[comm_rank_];
+    patch_up_ = split_points_[comm_rank_ + 1];
 
     orig_patch_low_ = patch_low_ / (Qx_*Qy_);
     orig_patch_up_ = (patch_up_ - 1) / (Qx_*Qy_);
@@ -704,8 +704,8 @@ void Solver::compute_near_singular_patches_estimate()
 
     }
 
-    std::vector<MPI_Count> recv_counts(world_size_);
-    std::vector<MPI_Aint> recv_displs(world_size_);
+    std::vector<MPI_Count> recv_counts(comm_size_);
+    std::vector<MPI_Aint> recv_displs(comm_size_);
 
     MPI_Count total_keys = grid.size();
 
@@ -713,7 +713,7 @@ void Solver::compute_near_singular_patches_estimate()
     
     MPI_Aint total_keys_all = 0;
 
-    for (int i = 0; i < world_size_; i++) {
+    for (int i = 0; i < comm_size_; i++) {
 
         recv_displs[i] = total_keys_all;
 
@@ -729,7 +729,7 @@ void Solver::compute_near_singular_patches_estimate()
     std::vector<long long>().swap(keys_loc);
     std::vector<long long>().swap(starts_loc);
 
-    std::vector<long long> total_values_all(world_size_);
+    std::vector<long long> total_values_all(comm_size_);
 
     MPI_Allgather(&total_values, 1, MPI_LONG_LONG, total_values_all.data(), 1, MPI_LONG_LONG, MPI_COMM_WORLD);
 
@@ -748,11 +748,11 @@ void Solver::compute_near_singular_patches_estimate()
     };
 
     std::vector<RMARequest> requests;
-    requests.reserve(grid.size() * (world_size_ - 1));
+    requests.reserve(grid.size() * (comm_size_ - 1));
 
-    for (int rank = 0; rank < world_size_; rank++) {
+    for (int rank = 0; rank < comm_size_; rank++) {
 
-        if (rank == world_rank_) continue;
+        if (rank == comm_rank_) continue;
 
         const auto recv_start = recv_displs[rank];
         const auto recv_end = recv_displs[rank] + recv_counts[rank];
@@ -813,14 +813,14 @@ void Solver::compute_near_singular_patches_estimate()
     start_sing_and_near_sing_patches_estimate_ = std::vector<long long>(patch_up_ - patch_low_);
     size_sing_and_near_sing_patches_estimate_ = std::vector<long long>(patch_up_ - patch_low_);
 
-    std::vector<std::unordered_set<long long>> patches_not_in_rank_acc(world_size_);
-    std::vector<std::unordered_set<long long>> patches_not_in_rank(world_size_);
+    std::vector<std::unordered_set<long long>> patches_not_in_rank_acc(comm_size_);
+    std::vector<std::unordered_set<long long>> patches_not_in_rank(comm_size_);
 
     #pragma omp parallel
     {
 
-    std::vector<std::unordered_set<long long>> patches_not_in_rank_acc_thread(world_size_);
-    std::vector<std::unordered_set<long long>> patches_not_in_rank_thread(world_size_);
+    std::vector<std::unordered_set<long long>> patches_not_in_rank_acc_thread(comm_size_);
+    std::vector<std::unordered_set<long long>> patches_not_in_rank_thread(comm_size_);
 
     std::vector<long long> sing_and_near_sing_patches_estimate_thread;
     
@@ -863,11 +863,11 @@ void Solver::compute_near_singular_patches_estimate()
 
             auto it = std::upper_bound(split_points_.begin(), split_points_.end(), patch_num_2);        
             int rank = static_cast<int>(std::distance(split_points_.begin(), it)) - 1;        
-            rank = std::max(0, std::min(rank, world_size_ - 1));
+            rank = std::max(0, std::min(rank, comm_size_ - 1));
 
             const long long q = patch_num_2 / (Qx_ * Qy_);
 
-            if (USE_ACCELERATOR && (rank != world_rank_)) {
+            if (USE_ACCELERATOR && (rank != comm_rank_)) {
 
                 patches_not_in_rank_acc_thread[rank].insert(patch_num_2);
 
@@ -893,7 +893,7 @@ void Solver::compute_near_singular_patches_estimate()
 
             sing_and_near_sing_patches_estimate_.insert(sing_and_near_sing_patches_estimate_.end(), sing_and_near_sing_patches_estimate_thread.begin(), sing_and_near_sing_patches_estimate_thread.end());
 
-            for (int ii = 0; ii < world_size_; ii++) {
+            for (int ii = 0; ii < comm_size_; ii++) {
 
                 patches_not_in_rank_acc[ii].insert(patches_not_in_rank_acc_thread[ii].begin(), patches_not_in_rank_acc_thread[ii].end());
                 patches_not_in_rank[ii].insert(patches_not_in_rank_thread[ii].begin(), patches_not_in_rank_thread[ii].end());
@@ -979,9 +979,9 @@ void Solver::compute_near_singular_patches_estimate()
 
         std::vector<char> recv_patch(bytes_per_patch);
 
-        for (int rank = 0; rank < world_size_; ++rank) {
+        for (int rank = 0; rank < comm_size_; ++rank) {
 
-            if (rank == world_rank_) continue;
+            if (rank == comm_rank_) continue;
 
             for (const auto& patch : patches_not_in_rank_acc[rank]) {
 
@@ -1028,25 +1028,25 @@ void Solver::compute_near_singular_patches_estimate()
     
     if (GEOMETRY != 0) {
 
-        for (int rank = 0; rank < world_size_; rank++) {
+        for (int rank = 0; rank < comm_size_; rank++) {
 
             const long long size = patches_not_in_rank[rank].size();
             const std::vector<long long> elements(patches_not_in_rank[rank].begin(), patches_not_in_rank[rank].end());
 
-            std::vector<long long> size_all(world_size_);
+            std::vector<long long> size_all(comm_size_);
 
             MPI_Gather(&size, 1, MPI_LONG_LONG, &size_all[0], 1, MPI_LONG_LONG, rank, MPI_COMM_WORLD);
 
             std::vector<long long> patches;
             
-            std::vector<int> recv_counts(world_size_);
-            std::vector<int> displs(world_size_, 0);
+            std::vector<int> recv_counts(comm_size_);
+            std::vector<int> displs(comm_size_, 0);
 
-            if (world_rank_ == rank) {
+            if (comm_rank_ == rank) {
 
                 long long total_elements = 0;
 
-                for (int i = 0; i < world_size_; i++) {
+                for (int i = 0; i < comm_size_; i++) {
 
                     recv_counts[i] = size_all[i];
 
@@ -1085,7 +1085,7 @@ void Solver::compute_near_singular_patches_estimate()
             std::vector<double> vector_dS;
             std::vector<double> vector_nuX, vector_nuY, vector_nuZ;
 
-            if (world_rank_ == rank) {
+            if (comm_rank_ == rank) {
                 
                 for (long long i = 0; i < patches.size(); i++) {
 
@@ -1151,21 +1151,21 @@ void Solver::compute_near_singular_patches_estimate()
 
             }
 
-            std::vector<int> recv_counts_imax(world_size_);
-            std::vector<int> recv_counts_jmax(world_size_);
-            std::vector<int> recv_counts_imaxjmaxkmax(world_size_);
+            std::vector<int> recv_counts_imax(comm_size_);
+            std::vector<int> recv_counts_jmax(comm_size_);
+            std::vector<int> recv_counts_imaxjmaxkmax(comm_size_);
 
             MPI_Gather(&imax_total, 1, MPI_INT, &recv_counts_imax[0], 1, MPI_INT, rank, MPI_COMM_WORLD);
             MPI_Gather(&jmax_total, 1, MPI_INT, &recv_counts_jmax[0], 1, MPI_INT, rank, MPI_COMM_WORLD);
             MPI_Gather(&imaxjmaxkmax_total, 1, MPI_INT, &recv_counts_imaxjmaxkmax[0], 1, MPI_INT, rank, MPI_COMM_WORLD);                
 
-            std::vector<int> displs_imax(world_size_, 0);
-            std::vector<int> displs_jmax(world_size_, 0);
-            std::vector<int> displs_imaxjmaxkmax(world_size_, 0);
+            std::vector<int> displs_imax(comm_size_, 0);
+            std::vector<int> displs_jmax(comm_size_, 0);
+            std::vector<int> displs_imaxjmaxkmax(comm_size_, 0);
 
-            if (world_rank_ == rank) {
+            if (comm_rank_ == rank) {
 
-                for (int i = 1; i < world_size_; i++) {
+                for (int i = 1; i < comm_size_; i++) {
 
                     displs_imax[i] = displs_imax[i-1] + recv_counts_imax[i-1];
                     displs_jmax[i] = displs_jmax[i-1] + recv_counts_jmax[i-1];
@@ -1281,7 +1281,7 @@ void Solver::setup(bool timing)
 
     double end_1 = MPI_Wtime();
 
-    if (timing && world_rank_ == 0) {
+    if (timing && comm_rank_ == 0) {
 
         std::cout << "Time compute parallel parameters: " << end_1 - start_1 << " seconds\n";
         print_max_RSS();
@@ -1300,7 +1300,7 @@ void Solver::setup(bool timing)
 
     double end_2 = MPI_Wtime();
 
-    if (GEOMETRY != 0 && timing && world_rank_ == 0) {
+    if (GEOMETRY != 0 && timing && comm_rank_ == 0) {
 
         std::cout << "Time load interpolated surface: " << end_2 - start_2 << " seconds\n";
         print_max_RSS();
@@ -1315,7 +1315,7 @@ void Solver::setup(bool timing)
 
     double end_3 = MPI_Wtime();
 
-    if (timing && world_rank_ == 0) {
+    if (timing && comm_rank_ == 0) {
 
         std::cout << "Time compute Fejer nodes and weights: " << end_3 - start_3 << " seconds\n";
         print_max_RSS();
@@ -1330,7 +1330,7 @@ void Solver::setup(bool timing)
 
     double end_4 = MPI_Wtime();
 
-    if (timing && world_rank_ == 0) {
+    if (timing && comm_rank_ == 0) {
 
         std::cout << "Time compute Chebyshev evaluations: " << end_4 - start_4 << " seconds\n";
         print_max_RSS();
@@ -1345,7 +1345,7 @@ void Solver::setup(bool timing)
 
     double end_5 = MPI_Wtime();
 
-    if (timing && world_rank_ == 0) {
+    if (timing && comm_rank_ == 0) {
 
         std::cout << "Time compute flags domain: " << end_5 - start_5 << " seconds\n";
         print_max_RSS();
@@ -1360,7 +1360,7 @@ void Solver::setup(bool timing)
 
     double end_6 = MPI_Wtime();
 
-    if (timing && world_rank_ == 0) {
+    if (timing && comm_rank_ == 0) {
 
         std::cout << "Time compute discretization domain: " << end_6 - start_6 << " seconds\n";
         print_max_RSS();
@@ -1375,7 +1375,7 @@ void Solver::setup(bool timing)
 
     double end_7 = MPI_Wtime();
 
-    if (timing && world_rank_ == 0) {
+    if (timing && comm_rank_ == 0) {
 
         std::cout << "Time compute coupling parameter: " << end_7 - start_7 << " seconds\n";
         print_max_RSS();
@@ -1390,7 +1390,7 @@ void Solver::setup(bool timing)
 
     double end_8 = MPI_Wtime();
 
-    if (timing && world_rank_ == 0) {
+    if (timing && comm_rank_ == 0) {
 
         std::cout << "Time compute near singular patches estimate: " << end_8 - start_8 << " seconds\n";
         print_max_RSS();
@@ -1405,7 +1405,7 @@ void Solver::setup(bool timing)
 
     double end_9 = MPI_Wtime();
 
-    if (timing && world_rank_ == 0) {
+    if (timing && comm_rank_ == 0) {
 
         std::cout << "Time compute precomputations data: " << end_9 - start_9 << " seconds\n";
         print_max_RSS();
@@ -1424,7 +1424,7 @@ void Solver::setup(bool timing)
 
     double end_10 = MPI_Wtime();
 
-    if (USE_ACCELERATOR && timing && world_rank_ == 0) {
+    if (USE_ACCELERATOR && timing && comm_rank_ == 0) {
 
         std::cout << "Time create IFGF object: " << end_10 - start_10 << " seconds\n";
         print_max_RSS();
@@ -1443,7 +1443,7 @@ void Solver::setup(bool timing)
 
     double end_11 = MPI_Wtime();
 
-    if (USE_ACCELERATOR && timing && world_rank_ == 0) {
+    if (USE_ACCELERATOR && timing && comm_rank_ == 0) {
 
         std::cout << "Time set precomputation data in IFGF: " << end_11 - start_11 << " seconds\n";
         print_max_RSS();
@@ -1462,7 +1462,7 @@ void Solver::setup(bool timing)
 
     double end_12 = MPI_Wtime();
 
-    if (USE_ACCELERATOR && timing && world_rank_ == 0) {
+    if (USE_ACCELERATOR && timing && comm_rank_ == 0) {
 
         std::cout << "Time compute new order points RP: " << end_12 - start_12 << " seconds\n";
         print_max_RSS();
@@ -1481,7 +1481,7 @@ void Solver::setup(bool timing)
 
     double end_13 = MPI_Wtime();
 
-    if (USE_ACCELERATOR && timing && world_rank_ == 0) {
+    if (USE_ACCELERATOR && timing && comm_rank_ == 0) {
 
         std::cout << "Time check patch in neighbours: " << end_13 - start_13 << " seconds\n";
         print_max_RSS();
@@ -1543,9 +1543,10 @@ Solver::Solver( const std::string directory,
                
 }
 
-void Solver::init_solver(const bool timing, const double k) {
+void Solver::init_solver(const bool timing, const double k, MPI_Comm mpi_comm) {
 
     WAVE_NUMBER = k;
+    mpi_comm_   = mpi_comm;
     
     Nu_int_ = N_PTS_PER_PATCH[0]; Nv_int_ = N_PTS_PER_PATCH[1];
     Nu_prec_ = N_PTS_SING_INT[0]; Nv_prec_ = N_PTS_SING_INT[1];

@@ -19,7 +19,7 @@ int main(int argc, char* argv[]) {
         double LAMBDA = 2.0 * 1 / 8.0; // 2.0 * M_PI / WAVE_NUMBER
         double WAVE_NUMBER = 2.0 * M_PI / LAMBDA;
 
-        new_object.init_solver(true, WAVE_NUMBER);
+        new_object.init_solver(true, WAVE_NUMBER, MPI_COMM_WORLD);
 
         PetscErrorCode ierr;  
 
