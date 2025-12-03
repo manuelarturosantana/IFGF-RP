@@ -41,6 +41,8 @@ class BoxTree
         int comm_size_;
         MPI_Comm mpi_comm_;
 
+        std::vector<int> N_PTS_PER_PATCH = std::vector<int>(2);
+
         std::vector<long long> split_points_orig_;
         std::vector<MPI_Count> recv_counts_orig_;
         std::vector<MPI_Aint> displs_orig_;
@@ -62,9 +64,13 @@ class BoxTree
         std::vector<std::unordered_set<long long>> points_not_in_rank_;
         std::unordered_map<long long, std::array<double, 7>> data_not_in_rank_;
 
+        // These parameters need to be passed in from Solver
         int nlevels_;
         double wavenumber_; 
         int equation_formulation_; 
+        bool USE_ADAPTIVITY;
+        bool USE_ACCELERATOR;
+        long long MAX_ELEMS_LEAF;
 
         double coupling_parameter_;
         std::unordered_map<long long, std::unordered_set<long long>> precomputations_data_;
@@ -3110,6 +3116,8 @@ class BoxTree
                               const std::vector<MPI_Count>& recv_counts,
                               const std::vector<MPI_Aint>& displs,
                               double coupling_parameter, double WAVE_NUMBER, int EQUATION_FORMULATION,
+                              int Nu_int, int Nv_int, 
+                              bool use_adaptivity, bool use_acc, long long max_elems_per_leaf, int n_levels_ifgf, 
                               std::vector<long long>& sorting, MPI_Comm mpi_comm)
         {
             
@@ -3121,10 +3129,16 @@ class BoxTree
             normal_y_ = std::vector<double>(ny_begin, ny_end);
             normal_z_ = std::vector<double>(nz_begin, nz_end);
 
-            nlevels_ = N_LEVELS_IFGF;
+            nlevels_ = n_levels_ifgf;
             wavenumber_ = WAVE_NUMBER;
             equation_formulation_ = EQUATION_FORMULATION;
             mpi_comm_ = mpi_comm;
+            N_PTS_PER_PATCH[0] = Nu_int;
+            N_PTS_PER_PATCH[1] = Nv_int;
+            USE_ADAPTIVITY = use_adaptivity;
+            MAX_ELEMS_LEAF = max_elems_per_leaf;
+            USE_ACCELERATOR = use_acc;
+
 
             split_points_orig_ = split_points;
             recv_counts_orig_  = recv_counts;
