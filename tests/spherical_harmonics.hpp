@@ -1,6 +1,9 @@
 #include "../src/solver2.h"
 #include "complex_bessel-master/include/complex_bessel.h"
-
+/*
+Note because I am lazy and don't want to write setters and getters for everything,
+to make this work one would have to go make all the private members public in solver.
+*/
 template<int PS, int PT>
 std::vector<std::complex<double>> compute_spherical_harmonics(Solver<PS, PT>& S)
 {

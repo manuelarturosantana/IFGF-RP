@@ -3,7 +3,6 @@
 #include <stdexcept>
 
 #include "../src/solver2.h"
-#include "spherical_harmonics.hpp"
 
 int main(int argc, char* argv[]) {
 
@@ -16,18 +15,23 @@ int main(int argc, char* argv[]) {
 
     try {
 
-        // Change the interpolation order
-        Solver<3,5> new_object(1,0,0,0);
-      
+        int rank = 0;
+        MPI_Comm_rank(MPI_COMM_WORLD,&rank);
 
-        // Solver new_object(1,0,0,0);
-        double LAMBDA = 4.0 * 1 / 8.0; // 2.0 * M_PI / WAVE_NUMBER
-        std::complex<double> WAVE_NUMBER(2.0 * M_PI / LAMBDA, -1.5);
+        // Change the interpolation order
+        Solver<3,5> new_object("../Nacelle/", "Nacelle-");
+
+        std::complex<double> WAVE_NUMBER(16, 0.0);
+        new_object.set_n_pts_per_patch(12,12);
 
         new_object.init_solver(true, WAVE_NUMBER, MPI_COMM_WORLD);
-
-        solve_spherical_harmonics(new_object);
         
+        if (rank == 0) {
+            std::cout << "The number of unknowns is " << new_object.get_num_unknowns() << std::endl;
+            std::cout << "The number of patch splits is (" << new_object.get_patch_split_x() << ", " << new_object.get_patch_split_y() << ") " << std::endl;
+        }
+        
+
     }
 
     catch (std::exception& e) {

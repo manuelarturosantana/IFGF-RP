@@ -300,7 +300,7 @@ void Solver<PS, PT>::compute_number_patch_splits() {
     // reduction on the maxes 
     // Compute number of patch splits per numer of wave lengths
 
-    double lambda = (2.0 * M_PI) / std::real(wavenumber_);
+    double lambda = (2.0 * M_PI) / std::real(WAVE_NUMBER);
     Qx_ = std::ceil(umaxlen / (lambda * num_wl_per_patch));
     Qy_ = std::ceil(vmaxlen / (lambda * num_wl_per_patch));
 
@@ -1394,7 +1394,6 @@ void Solver<PS,PT>::setup(bool timing)
                 load_interpolated_surface();
 
                 if (timing && comm_rank_ == 0) {
-                    std::cout << "Time compute number patch splits: " << end_3 - start_3 << " seconds\n";
                     std::cout << "(Qx, Qy) : (" << Qx_ << ", " << Qy_ << ")" << std::endl;
                 }
             }
