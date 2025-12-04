@@ -57,7 +57,7 @@ template<int PS = 3, int PT = 5>
 class Solver 
 {
 
-    private:
+    public:
 
         // TODO: MOVE THESE to the initialization
         long long Nu_int_, Nv_int_, Nu_prec_, Nv_prec_;
@@ -108,7 +108,7 @@ class Solver
         
         std::vector<double> dsdtjac_all_;
 
-        double coupling_parameter_;
+        std::complex<double> coupling_parameter_;
 
         std::vector<long long> sing_and_near_sing_patches_estimate_;
         std::vector<long long> start_sing_and_near_sing_patches_estimate_;
@@ -135,7 +135,9 @@ class Solver
         
         std::unordered_map<long long, std::vector<double>> dsdtjac_not_in_rank_;
 
-  
+        // Parameters which are changed when using the setters/getters
+        bool init_compute_coupling_param_ = true;
+        double num_wl_per_patch = 1;
 
     public:
         //////////////////////////////////// Parameters //////////////////////////////////
@@ -323,7 +325,6 @@ class Solver
      
         void static fac_1(const double distance, std::complex<double> wavenumber, std::complex<double>& sol); // GreenFunctions.cpp
 
-
         void compute_intensities_patch(const long long npatch,
                                        const std::complex<double>* phi, 
                                        std::complex<double>* intensities); // RP.cpp
@@ -364,8 +365,9 @@ class Solver
         std::complex<double> compute_incident_field(double x, double y, double z);  // SolveandEval.cpp 
                
 
-        std::vector<std::complex<double>> solve_u_inc(bool timing); 
-       
+        std::vector<std::complex<double>> solve_u_inc(bool timing); // SolveandEval.cpp 
+        
+        // Currently the far field is only supported for real wave numbers and coupling parameters
         void int_far_field(const double xVers_0, const double xVers_1, const double xVers_2,
                            const long long npatch, 
                            const std::complex<double>* phi,
@@ -393,6 +395,26 @@ class Solver
 
         void compute_near_field(const bool timing, const std::vector<std::complex<double>>& phi); // SolveandEval.cpp 
        
+          ////////////////////// Getters/ Setters //////////////////////////////////////////
+        MPI_Comm get_mpi_comm() const { return mpi_comm_;}
+
+        // Get the number of patches origonally
+        long long get_num_unknowns() const {return Q_ * Qx_ * Qy_ * Nv_int_ * Nu_int_;}
+
+        int get_patch_split_x() const {return Qx_;}
+        int get_patch_split_y() const {return Qy_;}
+        int get_nlevels_IFGF()  const {return nlevels_;}
+        std::complex<double> get_coup_param() const {return coupling_parameter_;}
+
+        std::vector<double> get_disc_points_x() const {return  disc_points_x_all_;}
+        std::vector<double> get_disc_points_y() const {return  disc_points_y_all_;}
+        std::vector<double> get_disc_points_z() const {return  disc_points_z_all_;}
+
+        void set_eq_form(int form) {EQUATION_FORMULATION = form;}
+        void set_int_ext(int int_ext) {INT_EXT = int_ext;}
+        void set_coup_param(std::complex<double> cp) {coupling_parameter_ = cp; init_compute_coupling_param_ = false;}
+        void set_num_wl_per_patch(double num_wl) {num_wl_per_patch = num_wl;}
+        //////////////////////////////////////////////////////////////////////////////////
 
         void init_solver(const bool timing, 
             const std::complex<double> k, MPI_Comm mpi_comm = MPI_COMM_WORLD);

@@ -570,7 +570,7 @@ void Solver<PS,PT>::int_far_field(const double xVers_0, const double xVers_1, co
         const double nz = nz_ptr[i];
 
         std::complex<double> kernel;
-        HH_far(xVers_0, xVers_1, xVers_2, px, py, pz, nx, ny, nz, coupling_parameter_, 
+        HH_far(xVers_0, xVers_1, xVers_2, px, py, pz, nx, ny, nz, coupling_parameter_.real(), 
               WAVE_NUMBER.real(),  kernel);
 
         sol_re += constant * (kernel.real() * phi[i].real() - kernel.imag() * phi[i].imag());
