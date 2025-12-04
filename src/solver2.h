@@ -57,9 +57,8 @@ template<int PS = 3, int PT = 5>
 class Solver 
 {
 
-    public:
+    private:
 
-        // TODO: MOVE THESE to the initialization
         long long Nu_int_, Nv_int_, Nu_prec_, Nv_prec_;
 
         long long Q_, Qx_, Qy_;
@@ -136,8 +135,9 @@ class Solver
         std::unordered_map<long long, std::vector<double>> dsdtjac_not_in_rank_;
 
         // Parameters which are changed when using the setters/getters
-        bool init_compute_coupling_param_ = true;
+        bool is_coupling_param_init = false;
         double num_wl_per_patch = 1;
+        bool split_patch_by_wavenumber_ = true;
 
     public:
         //////////////////////////////////// Parameters //////////////////////////////////
@@ -158,8 +158,6 @@ class Solver
         // -1 interior, 1 exterior problem
         static inline int INT_EXT = 1;
 
-
-
         // Discretization parameters:
 
         // Number of points used per dimension per patch in every patch
@@ -172,8 +170,7 @@ class Solver
         // // Number of points used with the singular integration
         int N_PTS_SING_INT[2] = {40, 40};
 
-        // Proximity distance that determines near singular integrals
-        int DELTA_METHOD = 1;
+        int DELTA_METHOD = 2;
         double PROXIMITY_BOX_SIZE = 0.1/16;
         double PERCENT_BOX_SIZE = 0.15;
 
@@ -245,6 +242,13 @@ class Solver
         void compute_parallel_parameters(); // ConstructorsandSetup.cpp
       
         void load_interpolated_surface(); // ConstructorsandSetup.cpp
+
+        // This function computes the length of each side of each patch 
+        // then choses how to split each patch using num_wl_per_patch on each side
+        // This implementation is global and chooses the number of splits in the u and 
+        // v direction the same for each patch. A better implementation would split each
+        // patch differently according to the patch size.
+        void compute_number_patch_splits(); // ConstructosandSetup.cpp
 
         void compute_fejer_nodes_and_weights(); // ConstructorsandSetup.cpp
 
@@ -395,15 +399,14 @@ class Solver
 
         void compute_near_field(const bool timing, const std::vector<std::complex<double>>& phi); // SolveandEval.cpp 
        
-          ////////////////////// Getters/ Setters //////////////////////////////////////////
+        ////////////////////// Getters/ Setters //////////////////////////////////////////
         MPI_Comm get_mpi_comm() const { return mpi_comm_;}
 
         // Get the number of patches origonally
         long long get_num_unknowns() const {return Q_ * Qx_ * Qy_ * Nv_int_ * Nu_int_;}
-
         int get_patch_split_x() const {return Qx_;}
         int get_patch_split_y() const {return Qy_;}
-        int get_nlevels_IFGF()  const {return nlevels_;}
+        int get_nlevels_IFGF()  const {return N_LEVELS_IFGF;}
         std::complex<double> get_coup_param() const {return coupling_parameter_;}
 
         std::vector<double> get_disc_points_x() const {return  disc_points_x_all_;}
@@ -412,8 +415,10 @@ class Solver
 
         void set_eq_form(int form) {EQUATION_FORMULATION = form;}
         void set_int_ext(int int_ext) {INT_EXT = int_ext;}
-        void set_coup_param(std::complex<double> cp) {coupling_parameter_ = cp; init_compute_coupling_param_ = false;}
+        void set_coup_param(std::complex<double> cp) {coupling_parameter_ = cp; is_coupling_param_init = true;}
         void set_num_wl_per_patch(double num_wl) {num_wl_per_patch = num_wl;}
+        void set_num_split_per_patch(double split_1, double split_2) {N_SPLIT_PER_PATCH[0] = split_1; N_SPLIT_PER_PATCH[1] = split_2; split_patch_by_wavenumber_ = false;}
+        void set_n_pts_per_patch(double pts1, double pts2) {N_PTS_PER_PATCH[0] = pts1; N_PTS_PER_PATCH[1] = pts2;}
         //////////////////////////////////////////////////////////////////////////////////
 
         void init_solver(const bool timing, 

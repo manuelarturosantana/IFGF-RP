@@ -229,6 +229,86 @@ void Solver<PS,PT>::load_interpolated_surface()
 
 }
 
+// Helper function for compute patch splits
+double inline norm3(double x1, double x2, double x3) {
+    return std::sqrt(x1*x1 + x2*x2 + x3*x3);
+}
+
+template <int PS, int PT>
+void Solver<PS, PT>::compute_number_patch_splits() {
+
+    // std::cout << "Before (Qx, Qy) : (" << Qx_ << ", " << Qy_ << ")" << std::endl;
+
+    // Track umaxlen, vmaxlen
+    double umaxlen = 0.0; double vmaxlen = 0.0;
+
+    // track number of fejer nodes/weights
+    int num_u_nodes = 0; int num_v_nodes = 0;
+
+    // init vector of fejer nodes/weights to a guess (say 200?)
+    std::vector<double> fejer_weights_u; fejer_weights_u.reserve(200);
+    std::vector<double>fejer_weights_v; fejer_weights_v.reserve(200);
+    // Track the length of the four sides of the patch
+    double lenum1, lenup1, lenvm1, lenvp1;
+
+    // loop over patches for this rank assuming the setup for the parallel parameters has
+    // already be called;
+    for (long long i = orig_patch_low_; i <= orig_patch_up_; i++) {
+         // set um1,u1,vm1,v1 to 0.0
+        lenum1 = 0.0; lenup1 = 0.0; lenvm1 = 0.0; lenvp1 = 0.0;
+
+        // Alias for the current patch
+        InterpPatch& cp = interp_surface_[i];
+        // for both u/v 
+        // if the number of nodes is different, recompute fejer weights
+        if (cp.imax != fejer_weights_u.size()) {
+            fejer_weights_u.resize(cp.imax);
+            fejerquadrature1(cp.uNodes, fejer_weights_u, cp.imax);
+        }
+
+        if (cp.jmax != fejer_weights_v.size()) {
+            fejer_weights_v.resize(cp.jmax);
+            fejerquadrature1(cp.vNodes, fejer_weights_v, cp.jmax);
+        }
+
+        // loop and grab the gradient, the use it to compute the length of the four sides
+        for (int uind = 0; uind < cp.imax; uind++) {
+            int indm1 = uind;
+            int indp1 = cp.imax * (cp.jmax - 1) + uind;
+            
+            lenum1 += fejer_weights_u[uind] * norm3(cp.dxdu[indm1], cp.dydu[indm1], cp.dzdu[indm1]);
+            lenup1 += fejer_weights_u[uind] * norm3(cp.dxdu[indp1], cp.dydu[indp1], cp.dzdu[indp1]);
+
+        }
+
+        for (int vind = 0; vind < cp.jmax; vind++) {
+            int indm1 = vind * cp.imax;
+            int indp1 = vind * cp.imax + (cp.imax - 1);
+            
+            lenvm1 += fejer_weights_v[vind] * norm3(cp.dxdu[indm1], cp.dydu[indm1], cp.dzdu[indm1]);
+            lenvp1 += fejer_weights_v[vind] * norm3(cp.dxdu[indp1], cp.dydu[indp1], cp.dzdu[indp1]);
+
+        }
+
+        umaxlen = std::max({umaxlen, lenum1, lenup1});
+        vmaxlen = std::max({vmaxlen, lenvm1, lenvp1});
+    }
+
+    MPI_Allreduce(MPI_IN_PLACE, &umaxlen, 1, MPI_DOUBLE, MPI_MAX, mpi_comm_);
+    MPI_Allreduce(MPI_IN_PLACE, &vmaxlen, 1, MPI_DOUBLE, MPI_MAX, mpi_comm_);
+
+    // reduction on the maxes 
+    // Compute number of patch splits per numer of wave lengths
+
+    double lambda = (2.0 * M_PI) / std::real(wavenumber_);
+    Qx_ = std::ceil(umaxlen / (lambda * num_wl_per_patch));
+    Qy_ = std::ceil(vmaxlen / (lambda * num_wl_per_patch));
+
+    // std::cout << "After (Qx, Qy) : (" << Qx_ << ", " << Qy_ << ")" << std::endl;
+    // std::exit(1);
+
+}
+
 template<int PS, int PT>
 void Solver<PS,PT>::compute_fejer_nodes_and_weights()
 {
@@ -1303,6 +1383,21 @@ void Solver<PS,PT>::setup(bool timing)
     if (GEOMETRY != 0) {
 
         load_interpolated_surface();
+            if (split_patch_by_wavenumber_) {
+                compute_number_patch_splits();
+                compute_parallel_parameters();
+                // There is a gotcha! here. interp_surface is not broadcast across the rankes
+                // orig patch low and orig patch high can change as Q_x, Q_y change,
+                // due to extra patches. To fix this so we need to read in the surface again after
+                // computing parallel paramter.s
+                interp_surface_.clear();
+                load_interpolated_surface();
+
+                if (timing && comm_rank_ == 0) {
+                    std::cout << "Time compute number patch splits: " << end_3 - start_3 << " seconds\n";
+                    std::cout << "(Qx, Qy) : (" << Qx_ << ", " << Qy_ << ")" << std::endl;
+                }
+            }
 
     }
 
@@ -1379,7 +1474,9 @@ void Solver<PS,PT>::setup(bool timing)
 
     double start_7 = MPI_Wtime();
 
-    compute_coupling_parameter();  
+    if (!is_coupling_param_init) {
+        compute_coupling_parameter();
+    }  
 
     double end_7 = MPI_Wtime();
 
