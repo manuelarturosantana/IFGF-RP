@@ -5,6 +5,10 @@
 #include "../src/solver2.h"
 #include "spherical_harmonics.hpp"
 
+/*
+Note because I am lazy for this to compile one must go make everything privatve in solver2.h public
+*/
+
 int main(int argc, char* argv[]) {
 
     int provided;

@@ -235,7 +235,7 @@ class Solver
         const double BBSIZEOFFSET = 0.0;
 
         // OpenMP parameters:
-        const int NTHREADS = 16;
+        int NTHREADS = 16;
 
         ///////////////////////////////// Methods ////////////////////////////////////////
 
@@ -398,6 +398,15 @@ class Solver
       
 
         void compute_near_field(const bool timing, const std::vector<std::complex<double>>& phi); // SolveandEval.cpp 
+
+        // Sends a vector of size N (the full problem size) from rank zero to all the ranks 
+        // in such a way that all the ranks hold their relevant portion of that vector.
+        void scatter_N_vector_from_zero(std::vector<std::complex<double>>& rank_0_vec, 
+            std::vector<std::complex<double>>& loc_vec); // SolveandEval.cpp
+
+        // Gathers a vector of size N (the full problem size) for all ranks onto the first rank.
+        void Solver<PS,PT>::gather_N_vector_to_zero(std::vector<std::complex<double>>& rank_0_vec, 
+            std::vector<std::complex<double>>& loc_vec); // SolveandEval.cpp
        
         ////////////////////// Getters/ Setters //////////////////////////////////////////
         MPI_Comm get_mpi_comm() const { return mpi_comm_;}

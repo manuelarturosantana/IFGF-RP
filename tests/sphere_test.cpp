@@ -18,8 +18,8 @@ int main(int argc, char* argv[]) {
         // Change the interpolation order
         Solver<3,5> new_object(1,0,0,0);
 
-        new_object.set_coup_param(std::complex<double>(1.0, 0.0));
-
+        // new_object.set_coup_param(std::complex<double>(1.0, 0.0));
+        new_object.NTHREADS = 1;
         // Solver new_object(1,0,0,0);
         double LAMBDA = 2.0 * 1 / 8.0; // 2.0 * M_PI / WAVE_NUMBER
         std::complex<double> WAVE_NUMBER(2.0 * M_PI / LAMBDA,0);

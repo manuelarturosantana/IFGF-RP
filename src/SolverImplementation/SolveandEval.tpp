@@ -315,55 +315,57 @@ std::vector<std::complex<double>> Solver<PS,PT>::solve(const std::vector<std::co
     user_ctx.func = [this](std::complex<double>* x, std::complex<double>* solution) -> void {iterator_function(x, solution);};
     user_ctx.n = N;
 
-    ierr = VecCreateMPIWithArray(PETSC_COMM_WORLD, 1, local_size, N, (const PetscScalar*)rhs.data(), &b);
-    CHKERRABORT(PETSC_COMM_WORLD, ierr);
+    // Note: Unless you change it PETSC_COMM_WORLD is guaranteed to be the same as MPI_COMM_WORLD,
+    // so this should still work
+    ierr = VecCreateMPIWithArray(mpi_comm_, 1, local_size, N, (const PetscScalar*)rhs.data(), &b);
+    CHKERRABORT(mpi_comm_, ierr);
 
     ierr = VecDuplicate(b, &x);
-    CHKERRABORT(PETSC_COMM_WORLD, ierr);
+    CHKERRABORT(mpi_comm_, ierr);
     
-    ierr = MatCreateShell(PETSC_COMM_WORLD, local_size, local_size, N, N, &user_ctx, &A);
-    CHKERRABORT(PETSC_COMM_WORLD, ierr);
+    ierr = MatCreateShell(mpi_comm_, local_size, local_size, N, N, &user_ctx, &A);
+    CHKERRABORT(mpi_comm_, ierr);
     ierr = MatShellSetOperation(A, MATOP_MULT, (void(*)(void))iterator_function_2);
-    CHKERRABORT(PETSC_COMM_WORLD, ierr);  
+    CHKERRABORT(mpi_comm_, ierr);  
     
-    ierr = KSPCreate(PETSC_COMM_WORLD, &ksp); 
-    CHKERRABORT(PETSC_COMM_WORLD, ierr);
+    ierr = KSPCreate(mpi_comm_, &ksp); 
+    CHKERRABORT(mpi_comm_, ierr);
     ierr = KSPSetOperators(ksp, A, A); 
-    CHKERRABORT(PETSC_COMM_WORLD, ierr);
+    CHKERRABORT(mpi_comm_, ierr);
     ierr = KSPSetType(ksp, KSPGMRES); 
-    CHKERRABORT(PETSC_COMM_WORLD, ierr);
+    CHKERRABORT(mpi_comm_, ierr);
     ierr = KSPSetTolerances(ksp, TOL_GMRES, PETSC_DEFAULT, PETSC_DEFAULT, MAX_ITER); 
-    CHKERRABORT(PETSC_COMM_WORLD, ierr);
+    CHKERRABORT(mpi_comm_, ierr);
     ierr = KSPSetFromOptions(ksp); 
-    CHKERRABORT(PETSC_COMM_WORLD, ierr);
+    CHKERRABORT(mpi_comm_, ierr);
     
     ierr = KSPSolve(ksp, b, x); 
-    CHKERRABORT(PETSC_COMM_WORLD, ierr);
+    CHKERRABORT(mpi_comm_, ierr);
 
     KSPConvergedReason reason;
     ierr = KSPGetConvergedReason(ksp, &reason); 
-    CHKERRABORT(PETSC_COMM_WORLD, ierr);
+    CHKERRABORT(mpi_comm_, ierr);
     if (reason < 0) {
-        PetscPrintf(PETSC_COMM_WORLD, "GMRES diverged with reason %d\n", reason);
+        PetscPrintf(mpi_comm_, "GMRES diverged with reason %d\n", reason);
     } else {
         PetscInt its;
         PetscReal rnorm;
         ierr = KSPGetIterationNumber(ksp, &its); 
-        CHKERRABORT(PETSC_COMM_WORLD, ierr);
+        CHKERRABORT(mpi_comm_, ierr);
         ierr = KSPGetResidualNorm(ksp, &rnorm); 
-        CHKERRABORT(PETSC_COMM_WORLD, ierr);
-        PetscPrintf(PETSC_COMM_WORLD, "GMRES converged in %d iterations with residual norm %g\n", its, (double)rnorm);
+        CHKERRABORT(mpi_comm_, ierr);
+        PetscPrintf(mpi_comm_, "GMRES converged in %d iterations with residual norm %g\n", its, (double)rnorm);
     }
     
     const PetscScalar *x_array;
     ierr = VecGetArrayRead(x, &x_array); 
-    CHKERRABORT(PETSC_COMM_WORLD, ierr);
+    CHKERRABORT(mpi_comm_, ierr);
 
     const std::complex<double> *complex_ptr = reinterpret_cast<const std::complex<double>*>(x_array);
     std::vector<std::complex<double>> x_sol(complex_ptr, complex_ptr + local_size);
 
     ierr = VecRestoreArrayRead(x, &x_array); 
-    CHKERRABORT(PETSC_COMM_WORLD, ierr);
+    CHKERRABORT(mpi_comm_, ierr);
 
     VecDestroy(&x);
     VecDestroy(&b);
@@ -641,7 +643,7 @@ std::complex<double> Solver<PS,PT>::compute_near_field_approx(const std::vector<
 
         int_near_field(x_0, x_1, x_2,
                         patch,
-                        &phi[patch_num * Nu_int_*Nv_int_],
+                        &phi[(patch_num - patch_low_)],
                         solution_loc);                        
         
         solution_rank += solution_loc;
@@ -1007,6 +1009,45 @@ void Solver<PS,PT>::compute_near_field(const bool timing, const std::vector<std:
         std::vector<std::complex<double>>().swap(u_total_all);
 
     }
+
+}
+
+template<int PS, int PT>
+void Solver<PS,PT>::scatter_N_vector_from_zero(std::vector<std::complex<double>>& rank_0_vec, 
+    std::vector<std::complex<double>>& loc_vec) 
+{
+
+    loc_vec.resize(recv_counts_2_[comm_rank_]);
+
+    MPI_Scatterv_c(comm_rank_ == 0 ? &rank_0_vec[0] : nullptr, 
+        &recv_counts_2_[0], 
+        &displs_2_[0], 
+        MPI_CXX_DOUBLE_COMPLEX, 
+        &loc_vec[0], 
+        recv_counts_2_[comm_rank_], 
+        MPI_CXX_DOUBLE_COMPLEX, 
+        0, 
+        mpi_comm_);
+
+}
+
+template<int PS, int PT>
+void Solver<PS,PT>::gather_N_vector_to_zero(std::vector<std::complex<double>>& rank_0_vec, 
+            std::vector<std::complex<double>>& loc_vec) 
+{
+    rank_0_vec.resize(get_num_unknowns());
+    
+    MPI_Gatherv_c(
+        loc_vec.data(),                
+        recv_counts_2_[comm_rank_],
+        MPI_CXX_DOUBLE_COMPLEX,
+        rank == 0 ? rank_0_vec.data() : nullptr,  
+        rank == 0 ? recv_counts_2_.data() : nullptr,
+        rank == 0 ? displs_2_.data()      : nullptr,
+        MPI_CXX_DOUBLE_COMPLEX,
+        0,                          
+        mpi_comm_
+);
 
 }
 

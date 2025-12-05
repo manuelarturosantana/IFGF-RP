@@ -15,8 +15,8 @@ void Solver<PS,PT>::compute_parallel_parameters()
         throw std::logic_error("Cannot use this code without MPI initialization\n");
     }
 
-    MPI_Comm_size(MPI_COMM_WORLD, &comm_size_);
-    MPI_Comm_rank(MPI_COMM_WORLD, &comm_rank_);
+    MPI_Comm_size(mpi_comm_, &comm_size_);
+    MPI_Comm_rank(mpi_comm_, &comm_rank_);
 
     split_points_ = std::vector<long long>(comm_size_ + 1);
     split_points_2_ = std::vector<long long>(comm_size_ + 1);
@@ -405,8 +405,8 @@ void Solver<PS,PT>::compute_flags_domain()
         flags_domain_u_all_ = std::vector<int>(Q_ * Qx_*Qy_);
         flags_domain_v_all_ = std::vector<int>(Q_ * Qx_*Qy_);
 
-        MPI_Allgatherv_c(flags_domain_u.data(), num_patches, MPI_INT, flags_domain_u_all_.data(), &recv_counts_[0], &displs_[0], MPI_INT, MPI_COMM_WORLD);
-        MPI_Allgatherv_c(flags_domain_v.data(), num_patches, MPI_INT, flags_domain_v_all_.data(), &recv_counts_[0], &displs_[0], MPI_INT, MPI_COMM_WORLD);
+        MPI_Allgatherv_c(flags_domain_u.data(), num_patches, MPI_INT, flags_domain_u_all_.data(), &recv_counts_[0], &displs_[0], MPI_INT, mpi_comm_);
+        MPI_Allgatherv_c(flags_domain_v.data(), num_patches, MPI_INT, flags_domain_v_all_.data(), &recv_counts_[0], &displs_[0], MPI_INT, mpi_comm_);
 
     } 
 
@@ -553,15 +553,15 @@ void Solver<PS,PT>::compute_discretization_domain()
 
         dsdtjac_all_ = std::vector<double>(Q_ * Qx_*Qy_ * Nu_int_*Nv_int_);
 
-        MPI_Allgatherv_c(&disc_points_x[0], point_up_-point_low_, MPI_DOUBLE, &disc_points_x_all_[0], &recv_counts_2_[0], &displs_2_[0], MPI_DOUBLE, MPI_COMM_WORLD);
-        MPI_Allgatherv_c(&disc_points_y[0], point_up_-point_low_, MPI_DOUBLE, &disc_points_y_all_[0], &recv_counts_2_[0], &displs_2_[0], MPI_DOUBLE, MPI_COMM_WORLD);
-        MPI_Allgatherv_c(&disc_points_z[0], point_up_-point_low_, MPI_DOUBLE, &disc_points_z_all_[0], &recv_counts_2_[0], &displs_2_[0], MPI_DOUBLE, MPI_COMM_WORLD);
+        MPI_Allgatherv_c(&disc_points_x[0], point_up_-point_low_, MPI_DOUBLE, &disc_points_x_all_[0], &recv_counts_2_[0], &displs_2_[0], MPI_DOUBLE, mpi_comm_);
+        MPI_Allgatherv_c(&disc_points_y[0], point_up_-point_low_, MPI_DOUBLE, &disc_points_y_all_[0], &recv_counts_2_[0], &displs_2_[0], MPI_DOUBLE, mpi_comm_);
+        MPI_Allgatherv_c(&disc_points_z[0], point_up_-point_low_, MPI_DOUBLE, &disc_points_z_all_[0], &recv_counts_2_[0], &displs_2_[0], MPI_DOUBLE, mpi_comm_);
 
-        MPI_Allgatherv_c(&norm_points_x[0], point_up_-point_low_, MPI_DOUBLE, &norm_points_x_all_[0], &recv_counts_2_[0], &displs_2_[0], MPI_DOUBLE, MPI_COMM_WORLD);
-        MPI_Allgatherv_c(&norm_points_y[0], point_up_-point_low_, MPI_DOUBLE, &norm_points_y_all_[0], &recv_counts_2_[0], &displs_2_[0], MPI_DOUBLE, MPI_COMM_WORLD);
-        MPI_Allgatherv_c(&norm_points_z[0], point_up_-point_low_, MPI_DOUBLE, &norm_points_z_all_[0], &recv_counts_2_[0], &displs_2_[0], MPI_DOUBLE, MPI_COMM_WORLD);
+        MPI_Allgatherv_c(&norm_points_x[0], point_up_-point_low_, MPI_DOUBLE, &norm_points_x_all_[0], &recv_counts_2_[0], &displs_2_[0], MPI_DOUBLE, mpi_comm_);
+        MPI_Allgatherv_c(&norm_points_y[0], point_up_-point_low_, MPI_DOUBLE, &norm_points_y_all_[0], &recv_counts_2_[0], &displs_2_[0], MPI_DOUBLE, mpi_comm_);
+        MPI_Allgatherv_c(&norm_points_z[0], point_up_-point_low_, MPI_DOUBLE, &norm_points_z_all_[0], &recv_counts_2_[0], &displs_2_[0], MPI_DOUBLE, mpi_comm_);
 
-        MPI_Allgatherv_c(&dsdtjac[0], point_up_-point_low_, MPI_DOUBLE, &dsdtjac_all_[0], &recv_counts_2_[0], &displs_2_[0], MPI_DOUBLE, MPI_COMM_WORLD);
+        MPI_Allgatherv_c(&dsdtjac[0], point_up_-point_low_, MPI_DOUBLE, &dsdtjac_all_[0], &recv_counts_2_[0], &displs_2_[0], MPI_DOUBLE, mpi_comm_);
 
     }
 
@@ -607,12 +607,12 @@ void Solver<PS,PT>::compute_coupling_parameter()
     double global_min_y;
     double global_min_z;
 
-    MPI_Allreduce(&loc_max_x, &global_max_x, 1, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD);
-    MPI_Allreduce(&loc_max_y, &global_max_y, 1, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD);
-    MPI_Allreduce(&loc_max_z, &global_max_z, 1, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD);
-    MPI_Allreduce(&loc_min_x, &global_min_x, 1, MPI_DOUBLE, MPI_MIN, MPI_COMM_WORLD);
-    MPI_Allreduce(&loc_min_y, &global_min_y, 1, MPI_DOUBLE, MPI_MIN, MPI_COMM_WORLD);
-    MPI_Allreduce(&loc_min_z, &global_min_z, 1, MPI_DOUBLE, MPI_MIN, MPI_COMM_WORLD);
+    MPI_Allreduce(&loc_max_x, &global_max_x, 1, MPI_DOUBLE, MPI_MAX, mpi_comm_);
+    MPI_Allreduce(&loc_max_y, &global_max_y, 1, MPI_DOUBLE, MPI_MAX, mpi_comm_);
+    MPI_Allreduce(&loc_max_z, &global_max_z, 1, MPI_DOUBLE, MPI_MAX, mpi_comm_);
+    MPI_Allreduce(&loc_min_x, &global_min_x, 1, MPI_DOUBLE, MPI_MIN, mpi_comm_);
+    MPI_Allreduce(&loc_min_y, &global_min_y, 1, MPI_DOUBLE, MPI_MIN, mpi_comm_);
+    MPI_Allreduce(&loc_min_z, &global_min_z, 1, MPI_DOUBLE, MPI_MIN, mpi_comm_);
 
     const double scatDiam = std::max({global_max_x - global_min_x, global_max_y - global_min_y, global_max_z - global_min_z});
     double LAMBDA = 2 * M_PI / std::real(WAVE_NUMBER);
@@ -705,17 +705,17 @@ void Solver<PS,PT>::compute_near_singular_patches_estimate()
     double cell_size_y;
     double cell_size_z;
 
-    MPI_Allreduce(&loc_max_x, &global_max_x, 1, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD);
-    MPI_Allreduce(&loc_max_y, &global_max_y, 1, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD);
-    MPI_Allreduce(&loc_max_z, &global_max_z, 1, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD);
+    MPI_Allreduce(&loc_max_x, &global_max_x, 1, MPI_DOUBLE, MPI_MAX, mpi_comm_);
+    MPI_Allreduce(&loc_max_y, &global_max_y, 1, MPI_DOUBLE, MPI_MAX, mpi_comm_);
+    MPI_Allreduce(&loc_max_z, &global_max_z, 1, MPI_DOUBLE, MPI_MAX, mpi_comm_);
 
-    MPI_Allreduce(&loc_min_x, &global_min_x, 1, MPI_DOUBLE, MPI_MIN, MPI_COMM_WORLD);
-    MPI_Allreduce(&loc_min_y, &global_min_y, 1, MPI_DOUBLE, MPI_MIN, MPI_COMM_WORLD);
-    MPI_Allreduce(&loc_min_z, &global_min_z, 1, MPI_DOUBLE, MPI_MIN, MPI_COMM_WORLD);
+    MPI_Allreduce(&loc_min_x, &global_min_x, 1, MPI_DOUBLE, MPI_MIN, mpi_comm_);
+    MPI_Allreduce(&loc_min_y, &global_min_y, 1, MPI_DOUBLE, MPI_MIN, mpi_comm_);
+    MPI_Allreduce(&loc_min_z, &global_min_z, 1, MPI_DOUBLE, MPI_MIN, mpi_comm_);
 
-    MPI_Allreduce(&cell_size_x_loc, &cell_size_x, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
-    MPI_Allreduce(&cell_size_y_loc, &cell_size_y, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
-    MPI_Allreduce(&cell_size_z_loc, &cell_size_z, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+    MPI_Allreduce(&cell_size_x_loc, &cell_size_x, 1, MPI_DOUBLE, MPI_SUM, mpi_comm_);
+    MPI_Allreduce(&cell_size_y_loc, &cell_size_y, 1, MPI_DOUBLE, MPI_SUM, mpi_comm_);
+    MPI_Allreduce(&cell_size_z_loc, &cell_size_z, 1, MPI_DOUBLE, MPI_SUM, mpi_comm_);
 
     cell_size_x /= (Q_ * Qx_*Qy_);
     cell_size_y /= (Q_ * Qx_*Qy_);
@@ -796,7 +796,7 @@ void Solver<PS,PT>::compute_near_singular_patches_estimate()
 
     MPI_Count total_keys = grid.size();
 
-    MPI_Allgather(&total_keys, 1, MPI_COUNT, recv_counts.data(), 1, MPI_COUNT, MPI_COMM_WORLD);
+    MPI_Allgather(&total_keys, 1, MPI_COUNT, recv_counts.data(), 1, MPI_COUNT, mpi_comm_);
     
     MPI_Aint total_keys_all = 0;
 
@@ -810,19 +810,19 @@ void Solver<PS,PT>::compute_near_singular_patches_estimate()
 
     std::vector<long long> keys_all(total_keys_all), starts_all(total_keys_all);
 
-    MPI_Allgatherv_c(keys_loc.data(), total_keys, MPI_LONG_LONG, keys_all.data(), recv_counts.data(), recv_displs.data(), MPI_LONG_LONG, MPI_COMM_WORLD);
-    MPI_Allgatherv_c(starts_loc.data(), total_keys, MPI_LONG_LONG, starts_all.data(), recv_counts.data(), recv_displs.data(), MPI_LONG_LONG, MPI_COMM_WORLD);
+    MPI_Allgatherv_c(keys_loc.data(), total_keys, MPI_LONG_LONG, keys_all.data(), recv_counts.data(), recv_displs.data(), MPI_LONG_LONG, mpi_comm_);
+    MPI_Allgatherv_c(starts_loc.data(), total_keys, MPI_LONG_LONG, starts_all.data(), recv_counts.data(), recv_displs.data(), MPI_LONG_LONG, mpi_comm_);
     
     std::vector<long long>().swap(keys_loc);
     std::vector<long long>().swap(starts_loc);
 
     std::vector<long long> total_values_all(comm_size_);
 
-    MPI_Allgather(&total_values, 1, MPI_LONG_LONG, total_values_all.data(), 1, MPI_LONG_LONG, MPI_COMM_WORLD);
+    MPI_Allgather(&total_values, 1, MPI_LONG_LONG, total_values_all.data(), 1, MPI_LONG_LONG, mpi_comm_);
 
     MPI_Win win_values;
 
-    MPI_Win_create(values_loc.data(), total_values * sizeof(long long), sizeof(long long), MPI_INFO_NULL, MPI_COMM_WORLD, &win_values);
+    MPI_Win_create(values_loc.data(), total_values * sizeof(long long), sizeof(long long), MPI_INFO_NULL, mpi_comm_, &win_values);
     
     MPI_Win_lock_all(MPI_MODE_NOCHECK, win_values);
 
@@ -1058,7 +1058,7 @@ void Solver<PS,PT>::compute_near_singular_patches_estimate()
         MPI_Info_set(info, "same_size", "true");
         MPI_Info_set(info, "same_disp_unit", "true");
 
-        MPI_Win_create(patch_buffer_local.data(), patch_buffer_local.size(), sizeof(char), info, MPI_COMM_WORLD, &win);
+        MPI_Win_create(patch_buffer_local.data(), patch_buffer_local.size(), sizeof(char), info, mpi_comm_, &win);
 
         MPI_Info_free(&info);
         
@@ -1122,7 +1122,7 @@ void Solver<PS,PT>::compute_near_singular_patches_estimate()
 
             std::vector<long long> size_all(comm_size_);
 
-            MPI_Gather(&size, 1, MPI_LONG_LONG, &size_all[0], 1, MPI_LONG_LONG, rank, MPI_COMM_WORLD);
+            MPI_Gather(&size, 1, MPI_LONG_LONG, &size_all[0], 1, MPI_LONG_LONG, rank, mpi_comm_);
 
             std::vector<long long> patches;
             
@@ -1151,7 +1151,7 @@ void Solver<PS,PT>::compute_near_singular_patches_estimate()
 
             }
 
-            MPI_Gatherv(&elements[0], size, MPI_LONG_LONG, &patches[0], &recv_counts[0], &displs[0], MPI_LONG_LONG, rank, MPI_COMM_WORLD);
+            MPI_Gatherv(&elements[0], size, MPI_LONG_LONG, &patches[0], &recv_counts[0], &displs[0], MPI_LONG_LONG, rank, mpi_comm_);
 
             std::vector<int> vector_imax;
             std::vector<int> vector_jmax;
@@ -1220,11 +1220,11 @@ void Solver<PS,PT>::compute_near_singular_patches_estimate()
 
             std::vector<long long> vector_zoneID_loc(size);
 
-            MPI_Scatterv(&vector_imax[0], &recv_counts[0], &displs[0], MPI_INT, &vector_imax_loc[0], size, MPI_INT, rank, MPI_COMM_WORLD);
-            MPI_Scatterv(&vector_jmax[0], &recv_counts[0], &displs[0], MPI_INT, &vector_jmax_loc[0], size, MPI_INT, rank, MPI_COMM_WORLD);
-            MPI_Scatterv(&vector_kmax[0], &recv_counts[0], &displs[0], MPI_INT, &vector_kmax_loc[0], size, MPI_INT, rank, MPI_COMM_WORLD);
+            MPI_Scatterv(&vector_imax[0], &recv_counts[0], &displs[0], MPI_INT, &vector_imax_loc[0], size, MPI_INT, rank, mpi_comm_);
+            MPI_Scatterv(&vector_jmax[0], &recv_counts[0], &displs[0], MPI_INT, &vector_jmax_loc[0], size, MPI_INT, rank, mpi_comm_);
+            MPI_Scatterv(&vector_kmax[0], &recv_counts[0], &displs[0], MPI_INT, &vector_kmax_loc[0], size, MPI_INT, rank, mpi_comm_);
 
-            MPI_Scatterv(&vector_zoneID[0], &recv_counts[0], &displs[0], MPI_LONG_LONG, &vector_zoneID_loc[0], size, MPI_LONG_LONG, rank, MPI_COMM_WORLD);
+            MPI_Scatterv(&vector_zoneID[0], &recv_counts[0], &displs[0], MPI_LONG_LONG, &vector_zoneID_loc[0], size, MPI_LONG_LONG, rank, mpi_comm_);
 
             int imax_total = 0;
             int jmax_total = 0;
@@ -1242,9 +1242,9 @@ void Solver<PS,PT>::compute_near_singular_patches_estimate()
             std::vector<int> recv_counts_jmax(comm_size_);
             std::vector<int> recv_counts_imaxjmaxkmax(comm_size_);
 
-            MPI_Gather(&imax_total, 1, MPI_INT, &recv_counts_imax[0], 1, MPI_INT, rank, MPI_COMM_WORLD);
-            MPI_Gather(&jmax_total, 1, MPI_INT, &recv_counts_jmax[0], 1, MPI_INT, rank, MPI_COMM_WORLD);
-            MPI_Gather(&imaxjmaxkmax_total, 1, MPI_INT, &recv_counts_imaxjmaxkmax[0], 1, MPI_INT, rank, MPI_COMM_WORLD);                
+            MPI_Gather(&imax_total, 1, MPI_INT, &recv_counts_imax[0], 1, MPI_INT, rank, mpi_comm_);
+            MPI_Gather(&jmax_total, 1, MPI_INT, &recv_counts_jmax[0], 1, MPI_INT, rank, mpi_comm_);
+            MPI_Gather(&imaxjmaxkmax_total, 1, MPI_INT, &recv_counts_imaxjmaxkmax[0], 1, MPI_INT, rank, mpi_comm_);                
 
             std::vector<int> displs_imax(comm_size_, 0);
             std::vector<int> displs_jmax(comm_size_, 0);
@@ -1275,31 +1275,31 @@ void Solver<PS,PT>::compute_near_singular_patches_estimate()
             std::vector<double> vector_dS_loc(imaxjmaxkmax_total);
             std::vector<double> vector_nuX_loc(imaxjmaxkmax_total), vector_nuY_loc(imaxjmaxkmax_total), vector_nuZ_loc(imaxjmaxkmax_total);
 
-            MPI_Scatterv(&vector_uNodes[0], &recv_counts_imax[0], &displs_imax[0], MPI_DOUBLE, &vector_uNodes_loc[0], imax_total, MPI_DOUBLE, rank, MPI_COMM_WORLD);
-            MPI_Scatterv(&vector_vNodes[0], &recv_counts_jmax[0], &displs_jmax[0], MPI_DOUBLE, &vector_vNodes_loc[0], jmax_total, MPI_DOUBLE, rank, MPI_COMM_WORLD);
+            MPI_Scatterv(&vector_uNodes[0], &recv_counts_imax[0], &displs_imax[0], MPI_DOUBLE, &vector_uNodes_loc[0], imax_total, MPI_DOUBLE, rank, mpi_comm_);
+            MPI_Scatterv(&vector_vNodes[0], &recv_counts_jmax[0], &displs_jmax[0], MPI_DOUBLE, &vector_vNodes_loc[0], jmax_total, MPI_DOUBLE, rank, mpi_comm_);
 
-            MPI_Scatterv(&vector_uWeights[0], &recv_counts_imax[0], &displs_imax[0], MPI_DOUBLE, &vector_uWeights_loc[0], imax_total, MPI_DOUBLE, rank, MPI_COMM_WORLD);
-            MPI_Scatterv(&vector_vWeights[0], &recv_counts_jmax[0], &displs_jmax[0], MPI_DOUBLE, &vector_vWeights_loc[0], jmax_total, MPI_DOUBLE, rank, MPI_COMM_WORLD);
+            MPI_Scatterv(&vector_uWeights[0], &recv_counts_imax[0], &displs_imax[0], MPI_DOUBLE, &vector_uWeights_loc[0], imax_total, MPI_DOUBLE, rank, mpi_comm_);
+            MPI_Scatterv(&vector_vWeights[0], &recv_counts_jmax[0], &displs_jmax[0], MPI_DOUBLE, &vector_vWeights_loc[0], jmax_total, MPI_DOUBLE, rank, mpi_comm_);
 
-            MPI_Scatterv(&vector_x[0], &recv_counts_imaxjmaxkmax[0], &displs_imaxjmaxkmax[0], MPI_DOUBLE, &vector_x_loc[0], imaxjmaxkmax_total, MPI_DOUBLE, rank, MPI_COMM_WORLD);
-            MPI_Scatterv(&vector_y[0], &recv_counts_imaxjmaxkmax[0], &displs_imaxjmaxkmax[0], MPI_DOUBLE, &vector_y_loc[0], imaxjmaxkmax_total, MPI_DOUBLE, rank, MPI_COMM_WORLD);
-            MPI_Scatterv(&vector_z[0], &recv_counts_imaxjmaxkmax[0], &displs_imaxjmaxkmax[0], MPI_DOUBLE, &vector_z_loc[0], imaxjmaxkmax_total, MPI_DOUBLE, rank, MPI_COMM_WORLD);
+            MPI_Scatterv(&vector_x[0], &recv_counts_imaxjmaxkmax[0], &displs_imaxjmaxkmax[0], MPI_DOUBLE, &vector_x_loc[0], imaxjmaxkmax_total, MPI_DOUBLE, rank, mpi_comm_);
+            MPI_Scatterv(&vector_y[0], &recv_counts_imaxjmaxkmax[0], &displs_imaxjmaxkmax[0], MPI_DOUBLE, &vector_y_loc[0], imaxjmaxkmax_total, MPI_DOUBLE, rank, mpi_comm_);
+            MPI_Scatterv(&vector_z[0], &recv_counts_imaxjmaxkmax[0], &displs_imaxjmaxkmax[0], MPI_DOUBLE, &vector_z_loc[0], imaxjmaxkmax_total, MPI_DOUBLE, rank, mpi_comm_);
             
-            MPI_Scatterv(&vector_mask[0], &recv_counts_imaxjmaxkmax[0], &displs_imaxjmaxkmax[0], MPI_INT, &vector_mask_loc[0], imaxjmaxkmax_total, MPI_INT, rank, MPI_COMM_WORLD);
+            MPI_Scatterv(&vector_mask[0], &recv_counts_imaxjmaxkmax[0], &displs_imaxjmaxkmax[0], MPI_INT, &vector_mask_loc[0], imaxjmaxkmax_total, MPI_INT, rank, mpi_comm_);
             
-            MPI_Scatterv(&vector_dxdu[0], &recv_counts_imaxjmaxkmax[0], &displs_imaxjmaxkmax[0], MPI_DOUBLE, &vector_dxdu_loc[0], imaxjmaxkmax_total, MPI_DOUBLE, rank, MPI_COMM_WORLD);
-            MPI_Scatterv(&vector_dydu[0], &recv_counts_imaxjmaxkmax[0], &displs_imaxjmaxkmax[0], MPI_DOUBLE, &vector_dydu_loc[0], imaxjmaxkmax_total, MPI_DOUBLE, rank, MPI_COMM_WORLD);
-            MPI_Scatterv(&vector_dzdu[0], &recv_counts_imaxjmaxkmax[0], &displs_imaxjmaxkmax[0], MPI_DOUBLE, &vector_dzdu_loc[0], imaxjmaxkmax_total, MPI_DOUBLE, rank, MPI_COMM_WORLD);
+            MPI_Scatterv(&vector_dxdu[0], &recv_counts_imaxjmaxkmax[0], &displs_imaxjmaxkmax[0], MPI_DOUBLE, &vector_dxdu_loc[0], imaxjmaxkmax_total, MPI_DOUBLE, rank, mpi_comm_);
+            MPI_Scatterv(&vector_dydu[0], &recv_counts_imaxjmaxkmax[0], &displs_imaxjmaxkmax[0], MPI_DOUBLE, &vector_dydu_loc[0], imaxjmaxkmax_total, MPI_DOUBLE, rank, mpi_comm_);
+            MPI_Scatterv(&vector_dzdu[0], &recv_counts_imaxjmaxkmax[0], &displs_imaxjmaxkmax[0], MPI_DOUBLE, &vector_dzdu_loc[0], imaxjmaxkmax_total, MPI_DOUBLE, rank, mpi_comm_);
             
-            MPI_Scatterv(&vector_dxdv[0], &recv_counts_imaxjmaxkmax[0], &displs_imaxjmaxkmax[0], MPI_DOUBLE, &vector_dxdv_loc[0], imaxjmaxkmax_total, MPI_DOUBLE, rank, MPI_COMM_WORLD);
-            MPI_Scatterv(&vector_dydv[0], &recv_counts_imaxjmaxkmax[0], &displs_imaxjmaxkmax[0], MPI_DOUBLE, &vector_dydv_loc[0], imaxjmaxkmax_total, MPI_DOUBLE, rank, MPI_COMM_WORLD);
-            MPI_Scatterv(&vector_dzdv[0], &recv_counts_imaxjmaxkmax[0], &displs_imaxjmaxkmax[0], MPI_DOUBLE, &vector_dzdv_loc[0], imaxjmaxkmax_total, MPI_DOUBLE, rank, MPI_COMM_WORLD);
+            MPI_Scatterv(&vector_dxdv[0], &recv_counts_imaxjmaxkmax[0], &displs_imaxjmaxkmax[0], MPI_DOUBLE, &vector_dxdv_loc[0], imaxjmaxkmax_total, MPI_DOUBLE, rank, mpi_comm_);
+            MPI_Scatterv(&vector_dydv[0], &recv_counts_imaxjmaxkmax[0], &displs_imaxjmaxkmax[0], MPI_DOUBLE, &vector_dydv_loc[0], imaxjmaxkmax_total, MPI_DOUBLE, rank, mpi_comm_);
+            MPI_Scatterv(&vector_dzdv[0], &recv_counts_imaxjmaxkmax[0], &displs_imaxjmaxkmax[0], MPI_DOUBLE, &vector_dzdv_loc[0], imaxjmaxkmax_total, MPI_DOUBLE, rank, mpi_comm_);
 
-            MPI_Scatterv(&vector_dS[0], &recv_counts_imaxjmaxkmax[0], &displs_imaxjmaxkmax[0], MPI_DOUBLE, &vector_dS_loc[0], imaxjmaxkmax_total, MPI_DOUBLE, rank, MPI_COMM_WORLD);
+            MPI_Scatterv(&vector_dS[0], &recv_counts_imaxjmaxkmax[0], &displs_imaxjmaxkmax[0], MPI_DOUBLE, &vector_dS_loc[0], imaxjmaxkmax_total, MPI_DOUBLE, rank, mpi_comm_);
 
-            MPI_Scatterv(&vector_nuX[0], &recv_counts_imaxjmaxkmax[0], &displs_imaxjmaxkmax[0], MPI_DOUBLE, &vector_nuX_loc[0], imaxjmaxkmax_total, MPI_DOUBLE, rank, MPI_COMM_WORLD);
-            MPI_Scatterv(&vector_nuY[0], &recv_counts_imaxjmaxkmax[0], &displs_imaxjmaxkmax[0], MPI_DOUBLE, &vector_nuY_loc[0], imaxjmaxkmax_total, MPI_DOUBLE, rank, MPI_COMM_WORLD);
-            MPI_Scatterv(&vector_nuZ[0], &recv_counts_imaxjmaxkmax[0], &displs_imaxjmaxkmax[0], MPI_DOUBLE, &vector_nuZ_loc[0], imaxjmaxkmax_total, MPI_DOUBLE, rank, MPI_COMM_WORLD);
+            MPI_Scatterv(&vector_nuX[0], &recv_counts_imaxjmaxkmax[0], &displs_imaxjmaxkmax[0], MPI_DOUBLE, &vector_nuX_loc[0], imaxjmaxkmax_total, MPI_DOUBLE, rank, mpi_comm_);
+            MPI_Scatterv(&vector_nuY[0], &recv_counts_imaxjmaxkmax[0], &displs_imaxjmaxkmax[0], MPI_DOUBLE, &vector_nuY_loc[0], imaxjmaxkmax_total, MPI_DOUBLE, rank, mpi_comm_);
+            MPI_Scatterv(&vector_nuZ[0], &recv_counts_imaxjmaxkmax[0], &displs_imaxjmaxkmax[0], MPI_DOUBLE, &vector_nuZ_loc[0], imaxjmaxkmax_total, MPI_DOUBLE, rank, mpi_comm_);
 
             long long start_imax = 0;
             long long start_jmax = 0;
@@ -1361,7 +1361,7 @@ template<int PS, int PT>
 void Solver<PS,PT>::setup(bool timing)
 {
 
-    MPI_Barrier(MPI_COMM_WORLD);
+    MPI_Barrier(mpi_comm_);
 
     double start_1 = MPI_Wtime();
 
@@ -1376,7 +1376,7 @@ void Solver<PS,PT>::setup(bool timing)
 
     }
 
-    MPI_Barrier(MPI_COMM_WORLD);
+    MPI_Barrier(mpi_comm_);
 
     double start_2 = MPI_Wtime();
 
@@ -1409,7 +1409,7 @@ void Solver<PS,PT>::setup(bool timing)
 
     }
 
-    MPI_Barrier(MPI_COMM_WORLD);
+    MPI_Barrier(mpi_comm_);
 
     double start_3 = MPI_Wtime();
 
@@ -1424,7 +1424,7 @@ void Solver<PS,PT>::setup(bool timing)
 
     }
 
-    MPI_Barrier(MPI_COMM_WORLD);
+    MPI_Barrier(mpi_comm_);
 
     double start_4 = MPI_Wtime();
 
@@ -1439,7 +1439,7 @@ void Solver<PS,PT>::setup(bool timing)
 
     }
 
-    MPI_Barrier(MPI_COMM_WORLD);
+    MPI_Barrier(mpi_comm_);
 
     double start_5 = MPI_Wtime();
 
@@ -1454,7 +1454,7 @@ void Solver<PS,PT>::setup(bool timing)
 
     }
 
-    MPI_Barrier(MPI_COMM_WORLD);
+    MPI_Barrier(mpi_comm_);
 
     double start_6 = MPI_Wtime();
 
@@ -1469,7 +1469,7 @@ void Solver<PS,PT>::setup(bool timing)
 
     }
 
-    MPI_Barrier(MPI_COMM_WORLD);
+    MPI_Barrier(mpi_comm_);
 
     double start_7 = MPI_Wtime();
 
@@ -1486,7 +1486,7 @@ void Solver<PS,PT>::setup(bool timing)
 
     }
 
-    MPI_Barrier(MPI_COMM_WORLD);  
+    MPI_Barrier(mpi_comm_);  
 
     double start_8 = MPI_Wtime();   
 
@@ -1501,7 +1501,7 @@ void Solver<PS,PT>::setup(bool timing)
 
     }
 
-    MPI_Barrier(MPI_COMM_WORLD);  
+    MPI_Barrier(mpi_comm_);  
 
     double start_9 = MPI_Wtime();
 
@@ -1516,7 +1516,7 @@ void Solver<PS,PT>::setup(bool timing)
 
     }
 
-    MPI_Barrier(MPI_COMM_WORLD);
+    MPI_Barrier(mpi_comm_);
 
     double start_10 = MPI_Wtime();
 
@@ -1535,7 +1535,7 @@ void Solver<PS,PT>::setup(bool timing)
 
     }
 
-    MPI_Barrier(MPI_COMM_WORLD);
+    MPI_Barrier(mpi_comm_);
 
     double start_11 = MPI_Wtime();
 
@@ -1554,7 +1554,7 @@ void Solver<PS,PT>::setup(bool timing)
 
     }
 
-    MPI_Barrier(MPI_COMM_WORLD); 
+    MPI_Barrier(mpi_comm_); 
 
     double start_12 = MPI_Wtime();
 
@@ -1573,7 +1573,7 @@ void Solver<PS,PT>::setup(bool timing)
 
     }
 
-    MPI_Barrier(MPI_COMM_WORLD); 
+    MPI_Barrier(mpi_comm_); 
 
     double start_13 = MPI_Wtime();
 
@@ -1592,7 +1592,7 @@ void Solver<PS,PT>::setup(bool timing)
 
     }
 
-    MPI_Barrier(MPI_COMM_WORLD);
+    MPI_Barrier(mpi_comm_);
 
 }
 
